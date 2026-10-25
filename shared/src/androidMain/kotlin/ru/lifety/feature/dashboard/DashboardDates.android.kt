@@ -15,7 +15,7 @@ internal actual fun dashboardPeriod(now: Long): DashboardPeriod {
     val month = (day.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }
     val monthStart = month.timeInMillis
     month.add(Calendar.MONTH, 1)
-    return DashboardPeriod(start, end, monthStart, month.timeInMillis, SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date(now)))
+    return DashboardPeriod(start, end, monthStart, month.timeInMillis, SimpleDateFormat("EEEE, d MMMM", Locale.forLanguageTag("ru")).format(Date(now)))
 }
 
-internal actual fun dashboardDate(timestamp: Long): String = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(Date(timestamp))
+internal actual fun dashboardDate(timestamp: Long): String = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.forLanguageTag("ru")).format(Date(timestamp))

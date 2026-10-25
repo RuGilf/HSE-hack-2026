@@ -1,5 +1,12 @@
 package ru.lifety.app
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,14 +24,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -39,6 +49,7 @@ import ru.lifety.app.navigation.TaskEditorRoute
 import ru.lifety.core.navigation.LocalPlannerNavigation
 import ru.lifety.core.navigation.PlannerNavigation
 import ru.lifety.core.repository.Repositories
+import ru.lifety.core.ui.LifetyMotion
 import ru.lifety.core.ui.LifetyIcon
 import ru.lifety.core.ui.LifetyMascot
 import ru.lifety.core.ui.LifetySymbol
@@ -65,6 +76,9 @@ fun LifetyApp(repositories: Repositories? = null) {
     val entry by controller.currentBackStackEntryAsState()
     val isEditor = entry?.destination?.hasRoute<TaskEditorRoute>() == true
     val route = entry?.destination?.route
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    val keyboardVisible by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
     var settings by rememberSaveable { mutableStateOf(false) }
     var planRoute by rememberSaveable { mutableStateOf(AppDestination.TASKS.route) }
     val navigator = remember(controller) {
@@ -92,9 +106,9 @@ fun LifetyApp(repositories: Repositories? = null) {
             Scaffold(
                 topBar = {
                     if (!isEditor) TopAppBar(
-                        title = { Text(if (section == AppDestination.DASHBOARD) "Lifety" else section.title, style = MaterialTheme.typography.headlineSmall) },
+                        title = { Text(if (section == AppDestination.DASHBOARD) "Lifety" else section.title, style = MaterialTheme.typography.titleLarge) },
                         navigationIcon = {
-                            if (section == AppDestination.DASHBOARD) LifetyMascot(Modifier.padding(start = 12.dp).size(40.dp), animated = false)
+                            if (section == AppDestination.DASHBOARD) LifetyMascot(Modifier.padding(start = 12.dp).size(32.dp), animated = false)
                         },
                         actions = {
                             IconButton(onClick = { settings = true }, modifier = Modifier.semantics { contentDescription = "Настройки" }) {
@@ -105,7 +119,7 @@ fun LifetyApp(repositories: Repositories? = null) {
                     )
                 },
                 bottomBar = {
-                    if (!isEditor) NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+                    if (!isEditor && !keyboardVisible) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 0.dp) {
                         sections.forEach { (item, symbol) ->
                             NavigationBarItem(selected = section == item,
                                 onClick = {
@@ -113,11 +127,11 @@ fun LifetyApp(repositories: Repositories? = null) {
                                     if (section != item) navigator.navigate(target)
                                 },
                                 icon = { LifetyIcon(symbol) },
-                                label = { Text(item.title, style = MaterialTheme.typography.labelSmall, maxLines = 1) },
+                                label = { Text(item.title, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = MaterialTheme.colorScheme.primary,
                                     selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
                                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 ),
@@ -126,14 +140,26 @@ fun LifetyApp(repositories: Repositories? = null) {
                     }
                 },
             ) { padding ->
-                NavHost(controller, startDestination = AppDestination.DASHBOARD.route, modifier = Modifier.fillMaxSize().padding(padding)) {
+                NavHost(
+                    controller, startDestination = AppDestination.DASHBOARD.route,
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                    enterTransition = { fadeIn(tween(LifetyMotion.Standard)) },
+                    exitTransition = { fadeOut(tween(LifetyMotion.Quick)) },
+                    popEnterTransition = { fadeIn(tween(LifetyMotion.Standard)) },
+                    popExitTransition = { fadeOut(tween(LifetyMotion.Quick)) },
+                ) {
                     composable(AppDestination.DASHBOARD.route) { DashboardScreen(Modifier.fillMaxSize()) }
                     composable(AppDestination.TASKS.route) { PlanScreen(modifier = Modifier.fillMaxSize()) }
                     composable(AppDestination.CALENDAR.route) { PlanScreen(initialCalendar = true, modifier = Modifier.fillMaxSize()) }
                     composable(AppDestination.FINANCE.route) { FinanceScreen(Modifier.fillMaxSize()) }
                     composable(AppDestination.ASSISTANT.route) { AssistantScreen(Modifier.fillMaxSize()) }
                     composable(AppDestination.HEALTH.route) { HealthScreen(Modifier.fillMaxSize()) }
-                    composable<TaskEditorRoute> { backStackEntry ->
+                    composable<TaskEditorRoute>(
+                        enterTransition = { EnterTransition.None },
+                        exitTransition = { ExitTransition.None },
+                        popEnterTransition = { EnterTransition.None },
+                        popExitTransition = { ExitTransition.None },
+                    ) { backStackEntry ->
                         val editor = backStackEntry.toRoute<TaskEditorRoute>()
                         TaskEditorScreen(editor.taskId, editor.scheduledAt, onClose = { controller.popBackStack() })
                     }

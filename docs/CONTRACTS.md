@@ -207,6 +207,9 @@ Finance notification service не обращается к БД: он публи�
 `LifetyMascot(modifier = Modifier, emotion = LifetyEmotion.Happy, animated = true)`
 доступен всем функциям без platform assets. Не дублировать цвета и drawing.
 Модели, репозитории, схема БД и feature entry signatures при редизайне не меняются.
+Android polish v2 использует стандартную M3 Typography, единые motion specs из
+`C/core/ui/LifetyMotion.kt`, компактные секции и сохранение черновиков при
+configuration change. Разрешения AI и процессное хранение ключа не менялись.
 
 ## Навигационные интеграционные точки
 
@@ -298,8 +301,14 @@ Codex 3 размещает AI-логику в `feature/assistant/ai/**`, исп�
 preview фиксирует JSON до явного Analyze; ключ хранится только в памяти процесса.
 Никаких записей в репозитории из AI. Полные контракты и ограничения —
 `C/feature/assistant/ai/README.md`. Health использует `HealthRepository.update`,
-Dashboard подписывается на все три общих repository Flow. Health Connect и
-HealthKit не подключены, новых permissions/Gradle-зависимостей нет.
+Dashboard подписывается на все три общих repository Flow. Android Health Connect импортирует сон и шаги только по явному действию,
+затем сохраняет точный предпросмотр через существующий HealthRepository.update
+после подтверждения. Разрешения AI от этого не меняются. На iOS остаётся ручной ввод;
+HealthKit не подключён. Android-only connect-client 1.2.0-alpha06 использует
+READ_SLEEP/READ_STEPS и Activity объяснения. SDK и его bound service включаются
+только на API 28+, minSdk приложения остаётся 24 с точечным overrideLibrary.
+Новых записей в Health Connect, фонового чтения и изменений SQL/DI нет.
+Точный workflow и ограничения — C/feature/health/INTEGRATION.md.
 
 Android notification adapter реализован Codex 2 в
 `ru.lifety.platform.notifications`. `ExpenseNotificationListener` зарегистрирован
@@ -312,6 +321,23 @@ uses-permission BIND_NOTIFICATION_LISTENER_SERVICE. Сам пользовате�
 Точные ограничения и инструкция демонстрации —
 `C/feature/finance/INTEGRATION.md`. Живой банковский push и системное разрешение
 пока не тестировались; подтверждение демо-уведомления проверено в Android.
+
+## Новый headless agent API
+
+Пакет `ru.lifety.feature.assistant.agent` владеет AgentRuntime, AgentSession,
+AgentRunner, AgentWorkspace и LifetyAgentEnvironment; источник —
+`codex/native-agent-harness` (`df063fa`). Это отдельный Kotlin API без подключения
+к AssistantScreen. Существующий UI/AI, root DI и навигация сохраняются.
+Android: `createAndroidAgentRuntime(applicationContext)`; iOS:
+`createIosAgentRuntime()`. Сессия получает существующий `Repositories?`.
+Scopes default-off, HTTP начинается только с `session.start`; записи приложений —
+через proposals и явный `runner.approve`. Health read-only. Перед подключением
+нужен UI разрешений, точного preview действий, управления памятью и lifecycle.
+Android vault.save явно сохраняет шифрованный ключ; это не меняет process-only
+политику старого AssistantScreen. QuickJS 1.0.15 — common dependency, для host
+runtime подставляется JVM artifact. SQL/Manifest не меняются. Точный API,
+лимиты и порядок cancel/join/close — C/feature/assistant/agent/INTEGRATION.md.
+Результат интеграционной проверки — docs/NATIVE_AGENT_REVIEW.md.
 
 ## Параллельная работа следующих трёх агентов
 

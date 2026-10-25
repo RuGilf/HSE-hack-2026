@@ -1,5 +1,7 @@
 package ru.lifety.feature.calendar
 
+import androidx.compose.animation.core.tween
+import ru.lifety.core.ui.LifetyMotion
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.datetime.DatePeriod
@@ -71,7 +74,10 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
     var monthIso by rememberSaveable { mutableStateOf(LocalDate(currentDay.year, currentDay.month.number, 1).toString()) }
     val selected = LocalDate.parse(selectedIso)
     val month = LocalDate.parse(monthIso)
-    val dates = remember(month) { monthGrid(month) }
+    val dates = remember(month) {
+        val grid = monthGrid(month)
+        if (grid.takeLast(7).none { it.month == month.month }) grid.dropLast(7) else grid
+    }
     val taskCounts = remember(state.tasks, zone) {
         state.tasks.flatMap { task -> listOfNotNull(task.scheduledAt, task.deadlineAt).map { localDate(it, zone) }.distinct() }.groupingBy { it }.eachCount()
     }
@@ -80,13 +86,13 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(state.actionError) { state.actionError?.let { snackbar.showSnackbar(it); model.dismissError() } }
     Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0), snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = { FloatingActionButton(onClick = { planner?.createTask(selected.atTime(9, 0).toInstant(zone).toEpochMilliseconds()) },
-            shape = androidx.compose.foundation.shape.CircleShape, containerColor = MaterialTheme.colorScheme.primary,
+            shape = MaterialTheme.shapes.large, containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier.semantics { contentDescription = "Добавить задачу на выбранный день" }) { LifetyIcon(LifetySymbol.Plus) } }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 100.dp)) {
             item {
-                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { monthIso = month.plus(DatePeriod(months = -1)).toString() }, modifier = Modifier.semantics { contentDescription = "Предыдущий месяц" }) { Text("‹") }
@@ -101,7 +107,7 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                                 week.forEach { day ->
                                     val chosen = day == selected
                                     Surface(onClick = { selectedIso = day.toString(); monthIso = LocalDate(day.year, day.month.number, 1).toString() },
-                                        modifier = Modifier.weight(1f).height(48.dp).semantics { contentDescription = "${formatDate(day)}, задач: ${taskCounts[day] ?: 0}" },
+                                        modifier = Modifier.weight(1f).height(48.dp).semantics { this.selected = chosen; contentDescription = "${formatDate(day)}, задач: ${taskCounts[day] ?: 0}" },
                                         shape = RoundedCornerShape(12.dp),
                                         color = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerLow,
                                         border = if (day == currentDay && !chosen) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null) {
@@ -114,12 +120,15 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                                 }
                             }
                         }
-                        TextButton(onClick = { selectedIso = currentDay.toString(); monthIso = LocalDate(currentDay.year, currentDay.month.number, 1).toString() }, modifier = Modifier.align(Alignment.End)) { Text("Сегодня") }
+
                     }
                 }
             }
             item {
-                Text(formatDate(selected), style = MaterialTheme.typography.titleLarge)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(formatDate(selected), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { selectedIso = currentDay.toString(); monthIso = LocalDate(currentDay.year, currentDay.month.number, 1).toString() }) { Text("Сегодня") }
+                }
                 Text("План и дедлайны · ${selectedTasks.size} задач", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             when {
@@ -129,8 +138,10 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                     Button(onClick = model::retry) { Text("Повторить") }
                 }
                 selectedTasks.isEmpty() -> item { LifetyEmptyState("Свободный день", "Оставь время для себя или добавь новый план.", emotion = LifetyEmotion.Calm, mascotSize = 72.dp) }
-                else -> items(selectedTasks, key = { it.id }) { task ->
+                else -> items(selectedTasks, key = { it.id }, contentType = { "task" }) { task ->
+                    androidx.compose.foundation.layout.Box(Modifier.animateItem(fadeInSpec = tween(LifetyMotion.Quick), placementSpec = tween(LifetyMotion.Standard), fadeOutSpec = tween(LifetyMotion.Quick))) {
                     TaskCard(task, task.id in state.busyIds, onOpen = { planner?.openTask(task.id) }, onToggle = { model.toggle(task) })
+                    }
                 }
             }
         }

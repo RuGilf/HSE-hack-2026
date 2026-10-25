@@ -1,5 +1,8 @@
 package ru.lifety.feature.tasks
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import ru.lifety.core.ui.LifetyMotion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.height
@@ -41,6 +44,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -72,9 +77,12 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
     val model = viewModel { TaskEditorViewModel(repository, taskId, initialScheduledAt) }
     val state by model.state.collectAsState()
     var confirmDelete by remember { mutableStateOf(false) }
-    LaunchedEffect(model) { model.finished.collect { onClose() } }
+    val scope = rememberCoroutineScope()
+    var closing by remember { mutableStateOf(false) }
     val saving by rememberUpdatedState(state.saving)
-    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { it != SheetValue.Hidden || !saving })
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { it != SheetValue.Hidden || !saving || closing })
+    LaunchedEffect(model) { model.finished.collect { closing = true; sheet.hide(); onClose() } }
+    val close: () -> Unit = { if (!closing && !state.saving) scope.launch { closing = true; sheet.hide(); onClose() } }
     BoxWithConstraints(modifier.fillMaxSize()) {
         val sheetHeight = maxHeight * 0.92f
         ModalBottomSheet(onDismissRequest = { if (!state.saving) onClose() }, sheetState = sheet,
@@ -82,19 +90,19 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
     Scaffold(modifier = Modifier.fillMaxWidth().height(sheetHeight), contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(title = { Text(if (taskId == null) "Новая задача" else "Редактирование", style = MaterialTheme.typography.titleLarge) },
-                navigationIcon = { IconButton(onClick = onClose, enabled = !state.saving, modifier = Modifier.semantics { contentDescription = "Закрыть редактор" }) { LifetyIcon(LifetySymbol.Close) } },
+                navigationIcon = { IconButton(onClick = close, enabled = !state.saving && !closing, modifier = Modifier.semantics { contentDescription = "Закрыть редактор" }) { LifetyIcon(LifetySymbol.Close) } },
                 windowInsets = WindowInsets(0, 0, 0, 0),
                 actions = { if (taskId != null && state.task != null) TextButton(onClick = { confirmDelete = true }, enabled = !state.saving) { Text("Удалить", color = MaterialTheme.colorScheme.error) } })
         },
         bottomBar = {
-            if (state.task != null) Surface(tonalElevation = 2.dp) {
-                Button(onClick = model::save, enabled = !state.saving, modifier = Modifier.fillMaxWidth().imePadding().padding(16.dp).height(52.dp)) {
+            if (state.task != null) Surface(color = MaterialTheme.colorScheme.background) {
+                Button(onClick = model::save, enabled = !state.saving, modifier = Modifier.fillMaxWidth().imePadding().padding(16.dp).height(48.dp)) {
                     if (state.saving) CircularProgressIndicator(modifier = Modifier.padding(end = 12.dp).size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                     Text(if (state.saving) "Сохраняем…" else if (taskId == null) "Создать задачу" else "Сохранить изменения")
                 }
             }
         }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             when {
                 state.loading -> CircularProgressIndicator()
                 state.task == null -> {
@@ -103,9 +111,8 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
                 }
                 else -> {
                     val task = requireNotNull(state.task)
-                    Text("Всё начинается с одного шага", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedTextField(value = task.title, onValueChange = model::setTitle, enabled = !state.saving,
-                        label = { Text("Что нужно сделать?") }, modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 5,
+                        label = { Text("Название задачи") }, modifier = Modifier.fillMaxWidth(), minLines = 1, maxLines = 4,
                         isError = task.title.isBlank() && state.error != null)
                     DateTimeField("Дата и время выполнения", task.scheduledAt, !state.saving, model::setScheduledAt)
                     DateTimeField("Дедлайн", task.deadlineAt, !state.saving, model::setDeadlineAt)
@@ -139,7 +146,7 @@ private fun DateTimeField(label: String, value: Long?, enabled: Boolean, onChang
     var error by remember { mutableStateOf<String?>(null) }
     val zone = TimeZone.currentSystemDefault()
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.animateContentSize(tween(LifetyMotion.Standard)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                 Switch(checked = value != null, enabled = enabled, modifier = Modifier.semantics { contentDescription = label },

@@ -7,7 +7,9 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -33,22 +35,20 @@ fun LifetyMascot(
     emotion: LifetyEmotion = LifetyEmotion.Happy,
     animated: Boolean = true,
 ) {
-    val breath: Float
-    if (animated) {
-        val transition = rememberInfiniteTransition(label = "lifetyBreath")
-        val value by transition.animateFloat(0f, 1f,
+    // Read animation only in the graphics layer: no composition/drawing at every frame.
+    val breath: State<Float> = if (animated) {
+        rememberInfiniteTransition(label = "lifetyBreath").animateFloat(0f, 1f,
             infiniteRepeatable(tween(2600), RepeatMode.Reverse), label = "lifetyBreathValue")
-        breath = value
-    } else breath = 0.5f
+    } else remember { mutableStateOf(0.5f) }
     Canvas(modifier.graphicsLayer {
-        translationY = -breath * 3.dp.toPx()
-        scaleX = 0.98f + breath * 0.02f
+        translationY = -breath.value * 3.dp.toPx()
+        scaleX = 0.98f + breath.value * 0.02f
         scaleY = scaleX
     }.semantics { contentDescription = "Lifety, ${emotion.description}" }) {
         val unit = size.minDimension
         val center = Offset(size.width / 2f, size.height / 2f)
         val radius = unit * 0.285f
-        drawCircle(Brush.radialGradient(listOf(LifetyColors.Accent.copy(alpha = 0.16f + breath * 0.04f), Color.Transparent), center, unit * 0.5f), unit * 0.5f, center)
+        drawCircle(Brush.radialGradient(listOf(LifetyColors.Accent.copy(alpha = 0.18f), Color.Transparent), center, unit * 0.5f), unit * 0.5f, center)
         drawCircle(LifetyColors.Accent.copy(alpha = 0.06f), radius, center, style = Stroke(unit * 0.10f))
         drawCircle(LifetyColors.Accent.copy(alpha = 0.16f), radius, center, style = Stroke(unit * 0.062f))
         drawCircle(LifetyColors.Accent, radius, center, style = Stroke(unit * 0.035f))

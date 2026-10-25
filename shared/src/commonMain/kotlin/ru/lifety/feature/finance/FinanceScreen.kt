@@ -1,5 +1,9 @@
 package ru.lifety.feature.finance
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -10,10 +14,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.mapSaver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ru.lifety.core.model.Expense
+import ru.lifety.core.ui.LifetyMotion
 import ru.lifety.core.ui.LocalRepositories
 import ru.lifety.core.ui.LifetyDateField
 import ru.lifety.core.ui.LifetyEmptyState
@@ -58,11 +64,16 @@ fun FinanceContent(
     var fromText by rememberSaveable { mutableStateOf(today.copy(day = 1).toString()) }
     var toText by rememberSaveable { mutableStateOf(today.firstDayOfNextMonth().previousDay().toString()) }
     var allTime by rememberSaveable { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<Expense?>(null) }
-    var suggestionId by remember { mutableStateOf<String?>(null) }
-    var showEditor by remember { mutableStateOf(false) }
+    var editing by rememberSaveable(stateSaver = listSaver<Expense?, Any>(
+        save = { expense -> expense?.let { listOf(it.id, it.amountMinor, it.currency, it.merchant, it.category, it.timestamp, it.source) }.orEmpty() },
+        restore = { values -> if (values.isEmpty()) null else Expense(values[0] as String, values[1] as Long, values[2] as String, values[3] as String, values[4] as String, values[5] as Long, values[6] as String) },
+    )) { mutableStateOf<Expense?>(null) }
+    var suggestionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showEditor by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<Expense?>(null) }
     var showBudget by remember { mutableStateOf(false) }
+    var showDates by rememberSaveable { mutableStateOf(false) }
+    var showImport by rememberSaveable { mutableStateOf(false) }
     // shortcut: session-only configuration; durable budgets need a Core preferences contract.
     val budgetMonth = today.toString().take(7)
     var budgets by rememberSaveable(budgetMonth, stateSaver = mapSaver<Map<String, Long>>(
@@ -99,14 +110,14 @@ fun FinanceContent(
             if (storageConnected) FloatingActionButton(onClick = {
                 if (!state.loading && !state.saving) { editing = null; suggestionId = null; showEditor = true }
             }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = androidx.compose.foundation.shape.CircleShape,
+                shape = MaterialTheme.shapes.large,
                 modifier = Modifier.semantics { contentDescription = "Добавить расход" }) {
                 LifetyIcon(LifetySymbol.Plus)
             }
         }) { padding ->
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 96.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (!storageConnected) item {
@@ -116,7 +127,7 @@ fun FinanceContent(
             Notice(state.error)
             TextButton(onClick = onRetry, enabled = !state.saving) { Text("Повторить загрузку") }
         }
-        if (state.loading || state.saving) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+        if (state.loading || state.saving) item { LinearProgressIndicator(Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.outlineVariant) }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FinancePeriod.entries.forEach { period ->
@@ -128,29 +139,20 @@ fun FinanceContent(
                 }
                 FilterChip(selected = allTime, onClick = { allTime = true }, label = { Text("Всё время") })
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LifetyDateField("С", fromText, { fromText = it; allTime = false }, modifier = Modifier.weight(1f))
-                LifetyDateField("По", toText, { toText = it; allTime = false }, modifier = Modifier.weight(1f))
+            TextButton(onClick = { showDates = !showDates }) {
+                LifetyIcon(LifetySymbol.Calendar, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (allTime) "Весь период" else "$fromText — $toText")
             }
-            Text("Даты в часовом поясе устройства · неделя — последние 7 дней", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            AnimatedVisibility(showDates, enter = LifetyMotion.RevealEnter, exit = LifetyMotion.RevealExit) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LifetyDateField("С", fromText, { fromText = it; allTime = false }, modifier = Modifier.weight(1f))
+                    LifetyDateField("По", toText, { toText = it; allTime = false }, modifier = Modifier.weight(1f))
+                }
+            }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (listOf("RUB", "USD", "EUR") + state.expenses.map { it.currency }).distinct().forEach { code ->
                     FilterChip(selected = currency == code, onClick = { currency = code }, label = { Text(code) })
-                }
-            }
-        }
-        if (storageConnected && !state.loading) item {
-            Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
-                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FinancePeriod.entries.forEach { period ->
-                        Column(Modifier.weight(1f)) {
-                            Text(period.title, style = MaterialTheme.typography.labelMedium)
-                            val amount = quickTotals[period]
-                            Text(amount?.let { formatMoney(it, currency) } ?: "Ошибка суммы",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (amount == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-                        }
-                    }
                 }
             }
         }
@@ -169,26 +171,52 @@ fun FinanceContent(
             }
             if (summary.byCategory.isNotEmpty()) item { CategoryChart(summary, currency) }
         }
+        if (storageConnected && !state.loading) item {
+            Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FinancePeriod.entries.forEach { period ->
+                        Column(Modifier.weight(1f)) {
+                            Text(period.title, style = MaterialTheme.typography.labelMedium)
+                            val amount = quickTotals[period]
+                            Text(amount?.let { formatMoney(it, currency) } ?: "Ошибка суммы",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (amount == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            }
+        }
         item {
             if (storageConnected && !state.loading) {
                 MonthlyBudgetCard(budgetMonth, currency, quickTotals[FinancePeriod.MONTH], budgets[currency],
                     onEdit = { showBudget = true })
             }
-            HorizontalDivider()
-            Text("Из уведомлений", style = MaterialTheme.typography.titleMedium)
-            Text("Только покупки. Перед записью проверьте сумму, магазин и дату.", style = MaterialTheme.typography.bodySmall)
-            FinanceNotificationAccess()
+        }
+        item {
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                ListItem(
+                    modifier = Modifier.clickable { showImport = !showImport },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                    headlineContent = { Text("Импорт уведомлений") },
+                    supportingContent = { Text(if (suggestions.isEmpty()) "Банки и доступ к уведомлениям" else "Ожидают подтверждения: ${suggestions.size}") },
+                    trailingContent = { Text(if (showImport) "Скрыть" else "Настроить", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) },
+                )
+                AnimatedVisibility(showImport, enter = LifetyMotion.RevealEnter, exit = LifetyMotion.RevealExit) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FinanceNotificationAccess()
+                        OutlinedButton(onClick = {
+                            FinanceNotifications.intake.demo(financeNow(), "demo-${financeNow()}-${kotlin.random.Random.nextLong()}")
+                        }) { Text("ДЕМО: тестовое уведомление") }
+                        Text("Тестовая запись будет отмечена ДЕМО. Расходы сохраняются после подтверждения.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
             if (importResult == ImportOutcome.UNREADABLE || importResult == ImportOutcome.UNRECOGNIZED) {
                 Text(if (importResult == ImportOutcome.UNREADABLE)
-                    "Содержимое банковского уведомления скрыто или недоступно. Добавьте расход вручную."
-                    else "Не удалось распознать сумму или формат уведомления. Добавьте расход вручную.",
-                    style = MaterialTheme.typography.bodySmall)
+                    "Содержимое уведомления скрыто. Добавьте расход вручную."
+                    else "Не удалось распознать уведомление. Добавьте расход вручную.", style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = { FinanceNotifications.intake.clearResult() }) { Text("Понятно") }
             }
-            OutlinedButton(onClick = {
-                FinanceNotifications.intake.demo(financeNow(), "demo-${financeNow()}-${kotlin.random.Random.nextLong()}")
-            }) { Text("ДЕМО: тестовое уведомление") }
-            Text("Демо не требует разрешений. Тестовая запись будет отмечена [ДЕМО].", style = MaterialTheme.typography.bodySmall)
         }
         items(suggestions, key = { "pending:${it.id}" }) { candidate ->
             OutlinedCard(Modifier.fillMaxWidth()) {
@@ -216,10 +244,12 @@ fun FinanceContent(
         }
         visible.groupBy { localFinanceDate(it.timestamp) }.forEach { (date, expenses) ->
             item(key = "date:$date") { Text(date.toString(), style = MaterialTheme.typography.titleSmall) }
-            items(expenses, key = { "expense:${it.id}" }) { expense ->
+            items(expenses, key = { "expense:${it.id}" }, contentType = { "expense" }) { expense ->
+                Box(Modifier.animateItem(placementSpec = tween(LifetyMotion.Standard), fadeInSpec = tween(LifetyMotion.Quick), fadeOutSpec = tween(LifetyMotion.Quick))) {
                 ExpenseRow(expense, enabled = storageConnected && !state.saving, onEdit = {
                     editing = expense; suggestionId = null; showEditor = true
                 }, onDelete = { deleting = expense })
+                }
             }
         }
     }
@@ -231,7 +261,6 @@ fun FinanceContent(
             val saved = if (suggestionId != null) onConfirm(expense) else onSave(expense)
             if (saved) {
                 suggestionId?.let { FinanceNotifications.inbox.dismiss(it) }
-                showEditor = false
                 true
             } else false
         })
@@ -258,19 +287,30 @@ private fun Notice(message: String) {
 
 @Composable
 private fun ExpenseRow(expense: Expense, enabled: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(expense.merchant, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+    var menu by remember { mutableStateOf(false) }
+    ListItem(
+        modifier = Modifier.clickable(enabled = enabled, onClick = onEdit),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+        headlineContent = { Text(expense.merchant, maxLines = 2) },
+        supportingContent = {
+            Text(categoryTitle(expense.category) + when {
+                expense.source == "demo-notification" -> " · ДЕМО"
+                expense.source.startsWith("notification:") -> " · Из уведомления"
+                else -> ""
+            })
+        },
+        trailingContent = {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text(formatMoney(expense.amountMinor, expense.currency), style = MaterialTheme.typography.titleSmall)
+                Box {
+                    IconButton(onClick = { menu = true }, enabled = enabled,
+                        modifier = Modifier.semantics { contentDescription = "Действия с расходом ${expense.merchant}" }) { LifetyIcon(LifetySymbol.More) }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text("Изменить") }, onClick = { menu = false; onEdit() })
+                        DropdownMenuItem(text = { Text("Удалить", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDelete() })
+                    }
+                }
             }
-            Text(categoryTitle(expense.category), style = MaterialTheme.typography.bodySmall)
-            if (expense.source == "demo-notification") Text("ДЕМО · тестовая запись", color = MaterialTheme.colorScheme.tertiary)
-            else if (expense.source.startsWith("notification:")) Text("Из уведомления · подтверждено", style = MaterialTheme.typography.bodySmall)
-            Row {
-                TextButton(onClick = onEdit, enabled = enabled) { Text("Изменить") }
-                TextButton(onClick = onDelete, enabled = enabled) { Text("Удалить") }
-            }
-        }
-    }
+        },
+    )
 }

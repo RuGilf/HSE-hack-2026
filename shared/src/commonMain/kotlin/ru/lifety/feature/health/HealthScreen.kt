@@ -1,15 +1,22 @@
 package ru.lifety.feature.health
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import ru.lifety.core.ui.LocalRepositories
+import ru.lifety.core.ui.*
 
 @Composable
 fun HealthScreen(modifier: Modifier = Modifier) {
@@ -18,45 +25,65 @@ fun HealthScreen(modifier: Modifier = Modifier) {
         val scope = rememberCoroutineScope()
         val controller = remember(repository, scope) { HealthController(repository, scope) }
         val state by controller.state.collectAsState()
-        var hours by remember { mutableStateOf("") }
-        var minutes by remember { mutableStateOf("") }
-        var steps by remember { mutableStateOf("") }
-        Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Забота о себе", style = MaterialTheme.typography.headlineLarge)
-            Text("Сон и движение помогают заметить свой ритм. Записи сохраняются на устройстве, автоматической отправки нет.", style = MaterialTheme.typography.bodyLarge)
-            if (repository == null) Text("Локальное хранилище ещё не подключено. Сохранение пока недоступно.", color = MaterialTheme.colorScheme.error)
-            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            val snapshot = state.snapshot
-            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Последние показатели", style = MaterialTheme.typography.titleLarge)
-                    Text("Сон", style = MaterialTheme.typography.labelLarge)
-                    Text(snapshot?.sleepMinutes?.let { "${it / 60} ч ${it % 60} мин" } ?: "Пока нет данных", style = MaterialTheme.typography.headlineMedium)
-                    Text("Шаги", style = MaterialTheme.typography.labelLarge)
-                    Text(snapshot?.steps?.toString() ?: "Пока нет данных", style = MaterialTheme.typography.headlineMedium)
-                    snapshot?.let { Text("Записано: ${healthRecordedAt(it.timestamp)}", style = MaterialTheme.typography.bodySmall) }
-                    if (snapshot == null) Text("Добавьте первую запись ниже. Неизвестные значения останутся пустыми, а не нулевыми.")
+        var hours by rememberSaveable { mutableStateOf("") }
+        var minutes by rememberSaveable { mutableStateOf("") }
+        var steps by rememberSaveable { mutableStateOf("") }
+        var importBusy by remember { mutableStateOf(false) }
+        val formEnabled = !state.saving && !importBusy
+        val focus = LocalFocusManager.current
+        val keyboard = LocalSoftwareKeyboardController.current
+        val snackbar = remember { SnackbarHostState() }
+        LaunchedEffect(state.saved) { if (state.saved) snackbar.showSnackbar("Показатели сохранены") }
+        Scaffold(modifier = modifier, contentWindowInsets = WindowInsets(0, 0, 0, 0), snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (repository == null) Text("Хранилище недоступно", color = MaterialTheme.colorScheme.error)
+                if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.outlineVariant)
+                val snapshot = state.snapshot
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        HealthMetric("Сон", snapshot?.sleepMinutes?.let { "${it / 60} ч ${it % 60} мин" } ?: "Нет данных", LifetySymbol.Sleep)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        HealthMetric("Шаги", snapshot?.steps?.toString() ?: "Нет данных", LifetySymbol.Steps)
+                        snapshot?.let { Text("Обновлено: ${healthRecordedAt(it.timestamp)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
                 }
+                HealthConnectSection(repository = repository, enabled = repository != null && !state.saving, onBusyChanged = { importBusy = it })
+                Text("Новая запись", style = MaterialTheme.typography.titleMedium)
+                Text("Сон за последнюю ночь и шаги за сегодня. Пустые поля останутся без данных.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(hours, { hours = it.take(4) }, Modifier.weight(1f), enabled = formEnabled, singleLine = true,
+                        label = { Text("Сон, часы") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }))
+                    OutlinedTextField(minutes, { minutes = it.take(4) }, Modifier.weight(1f), enabled = formEnabled, singleLine = true,
+                        label = { Text("Минуты") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }))
+                }
+                OutlinedTextField(steps, { steps = it.take(8) }, Modifier.fillMaxWidth(), enabled = formEnabled, singleLine = true,
+                    label = { Text("Шаги за сегодня") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { keyboard?.hide(); focus.clearFocus() }))
+                AnimatedVisibility(state.error != null, enter = LifetyMotion.RevealEnter, exit = LifetyMotion.RevealExit) {
+                    Column {
+                        Text(state.error.orEmpty(), color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = controller::reload, enabled = formEnabled) { Text("Обновить показатели") }
+                    }
+                }
+                Button(onClick = { keyboard?.hide(); focus.clearFocus(); controller.save(hours, minutes, steps) }, enabled = repository != null && formEnabled,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text(if (state.saving) "Сохранение…" else "Сохранить на устройстве")
+                }
+                Text("Ручной ввод · данные хранятся на устройстве", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("Добавить вручную", style = MaterialTheme.typography.titleLarge)
-            Text("Введите сон за последнюю ночь и шаги за сегодня. После сохранения будут показаны новые значения. Пустое поле означает «неизвестно».")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(hours, { hours = it }, Modifier.weight(1f), enabled = !state.saving, singleLine = true,
-                    label = { Text("Сон, часы") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                OutlinedTextField(minutes, { minutes = it }, Modifier.weight(1f), enabled = !state.saving, singleLine = true,
-                    label = { Text("Минуты") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            }
-            OutlinedTextField(steps, { steps = it }, Modifier.fillMaxWidth(), enabled = !state.saving, singleLine = true,
-                label = { Text("Шаги за сегодня") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            Button(onClick = { controller.save(hours, minutes, steps) }, enabled = repository != null && !state.saving) {
-                Text(if (state.saving) "Сохраняем…" else "Сохранить на устройстве")
-            }
-            if (state.saved) Text("Показатели сохранены локально.", color = MaterialTheme.colorScheme.primary)
-            state.error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = controller::reload, enabled = !state.saving) { Text("Обновить показатели") }
-            }
-            Text("Импорт из Health Connect пока недоступен. Сейчас можно добавить сон и шаги вручную.", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun HealthMetric(label: String, value: String, symbol: LifetySymbol) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        LifetyIcon(symbol, color = MaterialTheme.colorScheme.primary)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleLarge)
         }
     }
 }

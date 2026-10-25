@@ -28,4 +28,6 @@ dependencies {
     coreLibraryDesugaring(libs.android.desugar.jdk)
     implementation(project(":shared"))
     implementation(libs.androidx.activity.compose)
+    // The app manifest gates the SDK's bound service on API 28+, so its class must be visible here.
+    implementation(libs.androidx.health.connect)
 }
