@@ -36,17 +36,24 @@ fun RepositoryBootstrap(load: suspend () -> Repositories, content: @Composable (
     val ready = repositories
     if (ready != null) content(ready)
     else LifetyTheme {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground) {
-        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (failed) {
-                Text("Не удалось открыть локальное хранилище")
-                Button(onClick = { attempt++ }) { Text("Повторить") }
-            } else {
-                CircularProgressIndicator()
-                Text("Открываем ваш план…")
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+        ) {
+            Column(
+                Modifier.fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (failed) {
+                    Text("Не удалось открыть локальное хранилище")
+                    Button(onClick = { attempt++ }) { Text("Повторить") }
+                } else {
+                    CircularProgressIndicator()
+                    Text("Открываем ваш план…")
+                }
             }
-        }
         }
     }
 }

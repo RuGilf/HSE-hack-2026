@@ -37,6 +37,7 @@ fun LifetyDateField(label: String, value: String, onChange: (String) -> Unit, mo
     val selected = remember(value) { runCatching { LocalDate.parse(value) }.getOrNull() }
     Surface(onClick = { showPicker = true }, enabled = enabled, shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = modifier.semantics { contentDescription = "$label: ${selected?.let(::formatDate) ?: value}" }) {
         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {

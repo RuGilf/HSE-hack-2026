@@ -45,7 +45,10 @@ APK относительно корня worktree:
 - Месячный календарь с понедельника, переключение месяцев, выбор дня, индикаторы
   задач и переход в общий редактор. Учитывает и план, и дедлайн; совпадающие даты
   не дублируют задачу. Создание из календаря предлагает выбранный день в 09:00.
-- Material 3 с карточками, подтверждением удаления, FAB, светлой/тёмной темой.
+- Material 3 в неоновой тёмной палитре, карточки 20–24 dp, общие иконки и
+  анимированный маскот Lifety. Задачи и расходы редактируются в ModalBottomSheet.
+- Пять разделов: Главная, План, Финансы, Здоровье, Ассистент. Задачи и календарь
+  переключаются внутри Плана; настройки доступны в верхней панели.
 - Finance: ручное добавление/редактирование/удаление расходов, период и валюта,
   категории и сводки, сессионный бюджет. Банковские уведомления сохраняются
   только после подтверждения. Демо-уведомление работает без системного доступа.
@@ -76,7 +79,9 @@ androidApp/src/main/
     MainActivity.kt                           Bootstrap + root Compose
 shared/src/commonMain/kotlin/ru/lifety/
   app/
-    LifetyApp.kt                              NavHost, six feature entries
+    LifetyApp.kt                              NavHost, five primary sections
+    PlanScreen.kt                             Tasks / Calendar tabs
+    LifetySettingsSheet.kt                     Theme info + Finance entry
     RepositoryBootstrap.kt                    Loading/error/retry
     navigation/{AppDestination,RootNavigator,TaskEditorRoute}.kt
   core/
@@ -86,7 +91,8 @@ shared/src/commonMain/kotlin/ru/lifety/
     navigation/PlannerNavigation.kt           Editor integration point
     planner/TaskListViewModel.kt               Shared StateFlow state
     time/PlannerDates.kt                      KMP date/time and day selection
-    ui/{LocalRepositories,LifetyTheme,TaskCard,PlaceholderScreen}.kt
+    ui/                                       Theme, tokens, mascot, icons,
+                                              date/empty/task components
   database/
     DatabaseDriverFactory.kt                  SQLDelight Int adapters
     SqlDelightRepositories.kt                 Three persistent repositories
@@ -103,6 +109,12 @@ shared/src/androidHostTest/                    SQLite schema/persistence tests
 ```
 
 ## Интеграция других агентов
+
+Единый визуальный контракт и API маскота — в
+[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md); исходный концепт — в
+[docs/design/lifety-reference.png](docs/design/lifety-reference.png).
+Цвета и размеры задаются в `core/ui/LifetyDesign.kt`, тема — в `LifetyTheme.kt`.
+Агенты используют готовые компоненты; дополнительных функций ради концепта не требуется.
 
 Полные стабильные сигнатуры, пакеты, пути и правила — в
 [docs/CONTRACTS.md](docs/CONTRACTS.md). Владение файлами — в [AGENTS.md](AGENTS.md).
@@ -150,7 +162,7 @@ Android SDK **37**, Build Tools **36.0.0**, Xcode **27.1**.
 - Общий код, платформенный DI и UI скомпилированы для **iOS Simulator arm64**.
 
 Остаются предупреждения beta expect/actual classes и рекомендации lint по
-обновлению фиксированных зависимостей, launcher icon и data extraction rules.
+обновлению фиксированных зависимостей, data extraction rules. Launcher mark и системный splash обновлены под Lifety.
 Release APK unsigned; публикационная подпись не настраивалась.
 
 После объединения выполнен smoke test на временном эмуляторе **Android 15 API 35,
@@ -160,6 +172,12 @@ arm64**: установка и холодный запуск APK, создани
 Затем процесс принудительно остановлен и запущен снова: задача и оба расхода
 восстановились в интерфейсе; содержимое реальной Android SQLite также проверено.
 Ошибок AndroidRuntime не обнаружено.
+
+После редизайна повторены полная Android build/lint, все 34 host tests и компиляция
+общего UI для iOS Simulator arm64. На Android API 35 проверены пять пунктов,
+вкладки Плана, сохранение задачи и расхода через нижние листы, DatePicker и
+доступность сохранения при открытой клавиатуре. Дизайн-контракт фиксирован в
+`docs/DESIGN_SYSTEM.md`; модели и схема БД не менялись.
 
 Не проверены физический Android, API 24–25 runtime, реальный банковский push и
 системный notification access, iOS framework linking/runtime/device arm64.

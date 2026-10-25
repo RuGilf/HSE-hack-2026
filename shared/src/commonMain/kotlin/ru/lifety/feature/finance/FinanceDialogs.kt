@@ -76,7 +76,7 @@ internal fun ExpenseEditorDialog(
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     isError = attempted && merchant.isBlank(), enabled = !locked)
                 Text("Категория", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                // Two compact rows keep categories visible without widening the sheet.
+                // Pairs keep category labels readable within the sheet.
                 (financeCategories.keys + category).distinct().chunked(2).forEach { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { key ->

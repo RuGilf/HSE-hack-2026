@@ -197,6 +197,15 @@ Finance notification service не обращается к БД: он публи�
 через существующий repository только после подтверждения. Отдельный DI-адаптер
 сервису не нужен, отдельный Android process запрещён (очередь общая в памяти).
 
+## Общий визуальный контракт
+
+Все экраны используют корневую `ru.lifety.core.ui.LifetyTheme`. Палитра, размеры,
+типографика, правила маскота и точные API общих UI-компонентов закреплены в
+[DESIGN_SYSTEM.md](DESIGN_SYSTEM.md). Владелец `C/core/ui/**` — Codex 1.
+`LifetyMascot(modifier = Modifier, emotion = LifetyEmotion.Happy, animated = true)`
+доступен всем функциям без platform assets. Не дублировать цвета и drawing.
+Модели, репозитории, схема БД и feature entry signatures при редизайне не меняются.
+
 ## Навигационные интеграционные точки
 
 `ru.lifety.app.LifetyApp(repositories: Repositories? = null)` — общий Compose root.
@@ -218,7 +227,13 @@ iOS entry: `ru.lifety.app.MainViewController()` в `I/app/MainViewController.kt`
 | `health` / `HEALTH` | `ru.lifety.feature.health` | `C/feature/health/HealthScreen.kt`: `HealthScreen` |
 
 Корень использует Compose Navigation: `rememberNavController()` + `NavHost`.
-Шесть прежних строковых routes сохранены. Начальный раздел — dashboard;
+Шесть прежних строковых routes сохранены. Основных пунктов NavigationBar пять:
+**Главная, План, Финансы, Здоровье, Ассистент**. `tasks` открывает `PlanScreen`
+с вкладками Задачи/Календарь; `calendar` — совместимый вход в План с выбранным
+календарём. Оба отмечают один пункт «План». Состояния вкладок сохраняются.
+`TasksScreen` и `CalendarScreen` сохраняют свои публичные сигнатуры.
+Настройки открываются через кнопку верхней панели и `LifetySettingsSheet`.
+Начальный раздел — dashboard;
 верхние разделы сохраняют состояние при переключении, повторный выбор не создаёт
 дубликат destination. Android Back и iOS Back обрабатывает Navigation.
 
@@ -244,7 +259,9 @@ data class TaskEditorRoute(val taskId: String? = null, val scheduledAt: Long? = 
 `scheduledAt` задаёт начальное время для создания из календаря. Для редактирования
 передаётся только id, актуальная задача читается из репозитория. Opaque id не
 склеивается с URL: аргументы кодирует typed Navigation. Сохранение/удаление/отмена
-возвращают на предыдущий экран. Нижняя навигация скрыта в редакторе.
+возвращают на предыдущий экран. Редактор отображается через ModalBottomSheet,
+нижняя навигация скрыта в редакторе. Finance сохраняет свой локальный контракт
+`ExpenseEditorDialog`, но тоже отображает форму в ModalBottomSheet.
 
 Стабильная точка открытия planner из любой функции без импорта `feature.tasks`:
 
