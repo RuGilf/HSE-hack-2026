@@ -4,6 +4,9 @@
 Последующая доработка Android UI описана в [UI_POLISH.md](UI_POLISH.md).
 Новое обновление Health Connect (`14a4311`) интегрировано в `feature/core`
 поверх UI polish; подробности — [ASSISTANT_MERGE_REVIEW.md](ASSISTANT_MERGE_REVIEW.md).
+Native agent harness (`df063fa`) также включён целиком в `feature/core`;
+это API без замены текущего AssistantScreen. Review и проверки —
+[NATIVE_AGENT_REVIEW.md](NATIVE_AGENT_REVIEW.md).
 Ниже сохранён отчёт о первоначальном объединении функций.
 
 Ветка назначения: `feature/core`, worktree `/Users/rugilf/Projects/lifety-core`.

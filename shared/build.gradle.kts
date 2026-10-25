@@ -32,6 +32,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             api(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation("io.github.dokar3:quickjs-kt:1.0.15")
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)
             implementation(libs.ktor.client.core)
@@ -51,6 +52,16 @@ kotlin {
         }
         commonTest.dependencies { implementation(kotlin("test")) }
         getByName("androidHostTest").dependencies { implementation(libs.sqldelight.jdbc) }
+    }
+}
+
+// Android host tests need the desktop JVM native QuickJS binary.
+configurations.matching {
+    it.name.contains("HostTest", ignoreCase = true) && it.name.endsWith("RuntimeClasspath", ignoreCase = true)
+}.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("io.github.dokar3:quickjs-kt-android"))
+            .using(module("io.github.dokar3:quickjs-kt-jvm:1.0.15"))
     }
 }
 

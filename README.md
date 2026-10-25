@@ -51,6 +51,20 @@ APK относительно корня worktree:
 Подробные правила и размеры — в `docs/DESIGN_SYSTEM.md`, результаты проверки
 и ограничения измерения плавности — в [docs/UI_POLISH.md](docs/UI_POLISH.md).
 
+## Движок агента (API, без подключения UI)
+
+Включена ветка `codex/native-agent-harness` (`df063fa`): локальная рабочая папка,
+QuickJS-расчёты, история/память и предложения изменений с подтверждением.
+Текущий экран Assistant остаётся на прежнем opt-in API; runtime автоматически
+не запускается. Подключение UI описано в
+`shared/src/commonMain/kotlin/ru/lifety/feature/assistant/agent/INTEGRATION.md`.
+Новый Android vault отдельно поддерживает явное сохранение ключа через Keystore;
+старый экран продолжает держать ключ только в памяти процесса.
+
+Проверка объединения: Android build/lint, common metadata и iOS compile успешны;
+119 host tests прошли, 2 live eval пропущены без credentials.
+Отчёт — [docs/NATIVE_AGENT_REVIEW.md](docs/NATIVE_AGENT_REVIEW.md).
+
 ## Что работает
 
 - Создание, редактирование, удаление и выполнение задач. Фильтры актуальных,

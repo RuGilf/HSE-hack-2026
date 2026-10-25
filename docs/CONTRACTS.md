@@ -322,6 +322,23 @@ uses-permission BIND_NOTIFICATION_LISTENER_SERVICE. Сам пользовате�
 `C/feature/finance/INTEGRATION.md`. Живой банковский push и системное разрешение
 пока не тестировались; подтверждение демо-уведомления проверено в Android.
 
+## Новый headless agent API
+
+Пакет `ru.lifety.feature.assistant.agent` владеет AgentRuntime, AgentSession,
+AgentRunner, AgentWorkspace и LifetyAgentEnvironment; источник —
+`codex/native-agent-harness` (`df063fa`). Это отдельный Kotlin API без подключения
+к AssistantScreen. Существующий UI/AI, root DI и навигация сохраняются.
+Android: `createAndroidAgentRuntime(applicationContext)`; iOS:
+`createIosAgentRuntime()`. Сессия получает существующий `Repositories?`.
+Scopes default-off, HTTP начинается только с `session.start`; записи приложений —
+через proposals и явный `runner.approve`. Health read-only. Перед подключением
+нужен UI разрешений, точного preview действий, управления памятью и lifecycle.
+Android vault.save явно сохраняет шифрованный ключ; это не меняет process-only
+политику старого AssistantScreen. QuickJS 1.0.15 — common dependency, для host
+runtime подставляется JVM artifact. SQL/Manifest не меняются. Точный API,
+лимиты и порядок cancel/join/close — C/feature/assistant/agent/INTEGRATION.md.
+Результат интеграционной проверки — docs/NATIVE_AGENT_REVIEW.md.
+
 ## Параллельная работа следующих трёх агентов
 
 1. Все читают этот контракт и начинают от одного commit фундамента. Каждый получает
