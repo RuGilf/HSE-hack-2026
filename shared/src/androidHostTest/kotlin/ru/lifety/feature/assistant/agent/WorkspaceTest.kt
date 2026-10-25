@@ -102,7 +102,7 @@ class WorkspaceTest {
             val env = LifetyAgentEnvironment(testRepositories(), workspace, { 1000 })
             env.prepare(AgentScopes(finance = true, health = true), AgentDocument())
             assertTrue(workspace.read("data/health/latest.json").contains("null"))
-            assertTrue(workspace.read("INDEX.md").contains("healthHistoryAvailable=false"))
+            assertTrue(workspace.read("INDEX.md").contains("healthRepositoryHistoryAvailable=false"))
             workspace.write("reports/private.md", "derived finance data")
             env.reset(AgentScopes())
             env.prepare(AgentScopes(), AgentDocument())

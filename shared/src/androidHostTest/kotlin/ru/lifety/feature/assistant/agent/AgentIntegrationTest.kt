@@ -7,6 +7,103 @@ import ru.lifety.core.model.Task
 import kotlin.test.*
 
 class AgentIntegrationTest {
+    @Test fun directoryDiscoveryAcceptsATrailingSeparatorWithoutAllowingEscapes(): Unit = runBlocking {
+        val root = Files.createTempDirectory("lifety-agent-directory").toFile()
+        try {
+            val workspace = AgentWorkspace(LocalAgentDisk(root.path))
+            workspace.write("notes/source.md", "data")
+            assertEquals(listOf("notes/source.md"), workspace.files("notes/").map { it.path })
+            assertFailsWith<AgentFault> { workspace.files("../") }
+            assertFailsWith<AgentFault> { workspace.files("/") }
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun scriptToolSavesAndExecutesCodeInOneCallAndRejectsAStaleOverwriteBeforeRunning() = runBlocking {
+        val root = Files.createTempDirectory("lifety-agent-inline-script").toFile()
+        try {
+            val workspace = AgentWorkspace(LocalAgentDisk(root.path))
+            workspace.write("scratch/input.json", "[10,20,30]")
+            val tool = LifetyAgentEnvironment(null, workspace, { 1 }).registry.find("script_run")!!
+            val code = """const rows=JSON.parse(await fs.readText('scratch/input.json')); const total=rows.reduce((a,b)=>a+b,0); await fs.writeText('reports/total.txt',String(total)); console.log(total);"""
+            suspend fun run(content: String) = buildJsonObject { put("path", "scripts/sum.js"); put("content", content) }.let { args ->
+                validateArguments(tool.schema, args)
+                tool.execute(ToolInput(args, AgentScopes(), AgentDocument(), "u") { _, _, _ -> error("no app mutation") })
+            }
+            assertEquals("ok", run(code)["status"]!!.jsonPrimitive.content)
+            assertEquals(code, workspace.read("scripts/sum.js"), "The executed code must remain inspectable")
+            assertEquals("60", workspace.read("reports/total.txt"))
+            workspace.delete("reports/total.txt", revision("60"))
+            val fault = assertFailsWith<AgentFault> { run("console.log('replacement')") }
+            assertEquals("conflict", fault.code)
+            assertFalse(workspace.files("reports").any { it.path == "reports/total.txt" }, "A failed write must not execute the old script")
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun aSmallSourceFitsInOneDefaultReadWhileExplicitSlicesStayBounded() = runBlocking {
+        val root = Files.createTempDirectory("lifety-agent-read-size").toFile()
+        try {
+            val workspace = AgentWorkspace(LocalAgentDisk(root.path))
+            val source = "x".repeat(5400) + "END_OF_SOURCE"
+            workspace.write("scratch/source.csv", source)
+            val tool = LifetyAgentEnvironment(null, workspace, { 1 }).registry.find("files_read")!!
+            suspend fun read(limit: Int? = null) = tool.execute(ToolInput(buildJsonObject {
+                put("path", "scratch/source.csv"); limit?.let { put("limit", it) }
+            }, AgentScopes(), AgentDocument(), "u") { _, _, _ -> error("read only") })
+            val complete = read()
+            assertEquals(source, complete["text"]!!.jsonPrimitive.content, "A small source must not need three provider round trips")
+            assertEquals(JsonNull, complete["nextOffset"])
+            val sliced = read(2000)
+            assertEquals(2000, sliced["text"]!!.jsonPrimitive.content.length)
+            assertEquals(2000, sliced["nextOffset"]!!.jsonPrimitive.int)
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun currentTaskEvidenceSurvivesBatchedToolsAndOldTaskEvidenceCanBeOffloaded() = runBlocking {
+        val root = Files.createTempDirectory("lifety-agent-working-evidence").toFile()
+        try {
+            val workspace = AgentWorkspace(LocalAgentDisk(root.path))
+            workspace.write("notes/source.md", "verified observation ".repeat(100))
+            val env = LifetyAgentEnvironment(null, workspace, { 1 })
+            var step = 0
+            var currentEvidence = ""
+            var olderEvidence = ""
+            val model = AgentModel { request ->
+                when (step++) {
+                    0 -> ModelReply(calls = listOf(ToolCall("body", "files_read", """{"path":"notes/source.md","limit":6000}""")))
+                    1 -> ModelReply(calls = (1..6).map { ToolCall("list-$it", "files_list", """{"path":"notes"}""") })
+                    2 -> { currentEvidence = request.messages.single { it.callId == "body" }.text; ModelReply("Done") }
+                    else -> { olderEvidence = request.messages.single { it.callId == "body" }.text; ModelReply("Next answer") }
+                }
+            }
+            val runner = AgentRunner(model, MemoryAgentStore(), env.registry, env::snapshot, { 1 },
+                AgentLimits(compactAfterInputBytes = 100000, contextTokens = 65536))
+            runner.initialize(); runner.send("Analyse", AgentScopes())
+            assertEquals(RunPhase.IDLE, runner.state.value.phase)
+            assertTrue("verified observation" in currentEvidence && currentEvidence.length > 1000,
+                "A batch of tool calls must not evict evidence while its task is still running")
+            runner.send("Another question", AgentScopes())
+            assertTrue("\"status\":\"archived\"" in olderEvidence, "Completed-task evidence should remain retrievable by its archive path")
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun manifestDiscoversImportsAndSavedAnalysesWithoutLoadingTheirContents() = runBlocking {
+        val root = Files.createTempDirectory("lifety-agent-discovery").toFile()
+        try {
+            val workspace = AgentWorkspace(LocalAgentDisk(root.path))
+            workspace.write("notes/profile.md", "private content need not enter every prompt")
+            workspace.write("scratch/imported-sleep.csv", "date,sleepMinutes\n2026-10-24,440")
+            workspace.write("reports/sleep-review.md", "an older analysis, not an authoritative personal fact")
+            val env = LifetyAgentEnvironment(testRepositories(), workspace, { 1000 })
+            env.prepare(AgentScopes(health = true), AgentDocument())
+            val index = env.snapshot(AgentScopes(health = true))["workspace"]!!.jsonPrimitive.content
+            assertTrue("scratch/imported-sleep.csv" in index, "Discover supplemental sources before declaring history unavailable")
+            assertTrue("reports/sleep-review.md" in index, "A new session needs pointers to past analyses")
+            assertTrue("notes/profile.md" in index)
+            assertFalse("private content" in index, "Discover names first; retrieve bodies only when relevant")
+            assertTrue("healthRepositoryHistoryAvailable=false" in index, "A CSV must not claim repository/cloud history support")
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun runtimeRejectsASecondSessionUntilTheFirstIsClosed() = runBlocking {
         val root = Files.createTempDirectory("lifety-agent-session").toFile()
         try {

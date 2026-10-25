@@ -43,8 +43,9 @@ class AgentWorkspace(private val disk: AgentDisk, private val scriptTimeoutMilli
     private val lock = Mutex()
     private val writable = setOf("scripts", "scratch", "reports", "notes")
     suspend fun files(prefix: String = ""): List<WorkspaceFile> = lock.withLock {
-        if (prefix.isNotEmpty()) checkedPath(prefix)
-        disk.paths().filter { prefix.isEmpty() || it == prefix || it.startsWith("$prefix/") }.sorted().map { path ->
+        val directory = if (prefix.length > 1) prefix.removeSuffix("/") else prefix
+        if (directory.isNotEmpty()) checkedPath(directory)
+        disk.paths().filter { directory.isEmpty() || it == directory || it.startsWith("$directory/") }.sorted().map { path ->
             val text = disk.read(path) ?: ""
             WorkspaceFile(path, text.encodeToByteArray().size, revision(text))
         }
@@ -80,8 +81,9 @@ class AgentWorkspace(private val disk: AgentDisk, private val scriptTimeoutMilli
     suspend fun clear() = lock.withLock { disk.paths().forEach { disk.delete(it) } }
     suspend fun removeGenerated(prefix: String) = lock.withLock { disk.paths().filter { it.startsWith(prefix) }.forEach { disk.delete(it) } }
 
-    suspend fun runScript(path: String): JsonObject {
+    suspend fun runScript(path: String, content: String? = null, expectedRevision: String = ""): JsonObject {
         if (!path.startsWith("scripts/") || !path.endsWith(".js")) throw AgentFault("invalid_path", "Сохраните JavaScript в scripts/*.js перед запуском.")
+        if (content != null) write(path, content, expectedRevision)
         val code = read(path)
         if (code.length > 64000) throw AgentFault("file_limit", "Скрипт превышает 64000 символов")
         val output = StringBuilder()

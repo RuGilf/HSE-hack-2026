@@ -8,6 +8,20 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class OpenAiCompatibleTest {
+    @Test fun localMetadataDoesNotInterruptTheToolResultOrReplaceTheLatestUserRequest() {
+        val messages = listOf(
+            AgentMessage("u", "user", "Analyse my sleep"),
+            AgentMessage("a", "assistant", calls = listOf(ToolCall("read-1", "files_read", """{"path":"scratch/sleep.csv"}"""))),
+            AgentMessage("t", "tool", """{"status":"ok","text":"sleepMinutes\\n440"}""", callId = "read-1"),
+        )
+        val payload = requestMessages(ModelRequest("policy", "source index", messages, emptyList()))
+        assertEquals("tool", payload.last().jsonObject["role"]!!.jsonPrimitive.content,
+            "The model must continue after the tool receipt, not respond to an invented new user turn")
+        assertEquals("read-1", payload.last().jsonObject["tool_call_id"]!!.jsonPrimitive.content)
+        val question = requestMessages(ModelRequest("policy", "source index", messages.take(1), emptyList()))
+        assertEquals("Analyse my sleep", question.last().jsonObject["content"]!!.jsonPrimitive.content)
+    }
+
     @Test fun preservesOpaqueReasoningAcrossHttpToolCallsAndDiskCheckpoint() = runBlocking {
         val details = agentJson.parseToJsonElement("""[{"type":"reasoning.encrypted","data":"opaque-signature","format":"provider-v1","index":0},{"type":"reasoning.text","text":"synthetic reasoning","index":1}]""").jsonArray
         val received = AtomicReference<JsonObject?>(null)
