@@ -7,7 +7,8 @@ val agentJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
 @Serializable data class ToolCall(val id: String, val name: String, val arguments: String)
 @Serializable data class AgentMessage(val id: String, val role: String, val text: String = "",
-    val calls: List<ToolCall> = emptyList(), val callId: String? = null, val turn: Int = 0, val artifact: String? = null)
+    val calls: List<ToolCall> = emptyList(), val callId: String? = null, val turn: Int = 0, val artifact: String? = null,
+    val reasoningDetails: JsonArray? = null, val reasoning: String? = null)
 @Serializable data class AgentScopes(val finance: Boolean = false, val tasks: Boolean = false,
     val health: Boolean = false, val memory: Boolean = false) {
     fun allows(source: String) = when (source) {
@@ -29,7 +30,7 @@ data class AgentLimits(val maxModelCalls: Int = 16, val maxToolCalls: Int = 48,
     val compactAfterInputBytes: Int = 12000,
     val maxToolResultChars: Int = 8000, val maxRunMillis: Long = 180000, val contextTokens: Int = 32768)
 data class ModelReply(val text: String = "", val calls: List<ToolCall> = emptyList(), val truncated: Boolean = false,
-    val promptTokens: Int? = null)
+    val promptTokens: Int? = null, val reasoningDetails: JsonArray? = null, val reasoning: String? = null)
 data class ModelRequest(val system: String, val context: String, val messages: List<AgentMessage>,
     val tools: List<AgentTool>, val outputReserveTokens: Int = 2048, val purpose: String = "answer")
 fun interface AgentModel { suspend fun complete(request: ModelRequest): ModelReply }

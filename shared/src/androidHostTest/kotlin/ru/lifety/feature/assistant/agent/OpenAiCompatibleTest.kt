@@ -8,6 +8,59 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class OpenAiCompatibleTest {
+    @Test fun preservesOpaqueReasoningAcrossHttpToolCallsAndDiskCheckpoint() = runBlocking {
+        val details = agentJson.parseToJsonElement("""[{"type":"reasoning.encrypted","data":"opaque-signature","format":"provider-v1","index":0},{"type":"reasoning.text","text":"synthetic reasoning","index":1}]""").jsonArray
+        val received = AtomicReference<JsonObject?>(null)
+        var calls = 0
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/v1/chat/completions") { exchange ->
+            received.set(agentJson.parseToJsonElement(exchange.requestBody.bufferedReader().readText()).jsonObject)
+            val response = if (calls++ == 0) buildJsonObject {
+                putJsonArray("choices") { addJsonObject {
+                    put("finish_reason", "tool_calls")
+                    putJsonObject("message") {
+                        put("content", JsonNull)
+                        put("reasoning_details", details)
+                        putJsonArray("tool_calls") { addJsonObject {
+                            put("id", "reasoned-call"); put("type", "function")
+                            putJsonObject("function") { put("name", "missing"); put("arguments", "{}") }
+                        } }
+                    }
+                } }
+            }.toString() else """{"choices":[{"finish_reason":"stop","message":{"content":"done"}}]}"""
+            val bytes = response.toByteArray()
+            exchange.sendResponseHeaders(200, bytes.size.toLong()); exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        val root = java.nio.file.Files.createTempDirectory("lifety-reasoning").toFile()
+        val transport = OpenAiCompatibleModel(ProviderSettings("http://127.0.0.1:${server.address.port}/v1", "fixture"), "fixture-key")
+        try {
+            val store = JsonAgentStore(LocalAgentDisk(root.path))
+            val runner = AgentRunner(transport, store, AgentTools(emptyList()), now = { 1 })
+            runner.initialize(); runner.send("test", AgentScopes())
+            assertEquals(RunPhase.IDLE, runner.state.value.phase)
+            assertEquals(2, calls)
+            val sentAssistant = received.get()!!.getValue("messages").jsonArray.map { it.jsonObject }
+                .single { it["role"]?.jsonPrimitive?.content == "assistant" }
+            assertEquals(details, sentAssistant["reasoning_details"])
+            assertEquals(JsonNull, sentAssistant["content"])
+            assertFalse("reasoning" in sentAssistant)
+            assertEquals(details, store.read()!!.messages.first { it.role == "assistant" }.reasoningDetails)
+            assertFalse(root.resolve("checkpoint.json").readText().contains("fixture-key"))
+        } finally { transport.close(); server.stop(0); root.deleteRecursively() }
+    }
+
+    @Test fun preservesPlainReasoningAndReadsCheckpointsFromBeforeTheExtension() {
+        val legacy = agentJson.decodeFromString<AgentDocument>("""{"messages":[{"id":"old","role":"assistant","text":"hello"}]}""")
+        assertNull(legacy.messages.single().reasoningDetails)
+        val message = AgentMessage("a", "assistant", "answer", reasoning = "synthetic provider metadata")
+        val request = ModelRequest("policy", "", listOf(message), emptyList())
+        val sent = requestMessages(request).last().jsonObject
+        assertEquals("synthetic provider metadata", sent["reasoning"]?.jsonPrimitive?.content)
+        assertFalse("reasoning_details" in sent)
+        assertTrue(inputTokenBound(request) > inputTokenBound(request.copy(messages = listOf(message.copy(reasoning = null)))))
+    }
+
     @Test fun runtimeLeavesGenerationLimitsToTheProvider() = runBlocking {
         val captured = AtomicReference<JsonObject?>(null)
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)

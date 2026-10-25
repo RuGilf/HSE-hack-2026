@@ -3,6 +3,8 @@
 package ru.lifety.feature.assistant.ai
 
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeoutCapability
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.engine.HttpClientEngineBase
 import io.ktor.client.engine.HttpClientEngineConfig
 import io.ktor.client.engine.callContext
@@ -17,14 +19,17 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
 
 /** Feature-local recording engine: exercises the real Ktor request without a new Gradle dependency. */
-private class RecordingEngine(private val response: String, private val status: HttpStatusCode = HttpStatusCode.OK, private val failure: Exception? = null) : HttpClientEngineBase("lifety-fixture") {
+private class RecordingEngine(private val response: String, private val status: HttpStatusCode = HttpStatusCode.OK, private val failure: Exception? = null,
+    private val delayMillis: Long = 0) : HttpClientEngineBase("lifety-fixture") {
     override val config = HttpClientEngineConfig()
+    override val supportedCapabilities = setOf(HttpTimeoutCapability)
     override val dispatcher = Dispatchers.Unconfined
     var request: HttpRequestData? = null
     var calls = 0
     override suspend fun execute(data: HttpRequestData): HttpResponseData {
         calls++; request = data
         failure?.let { throw it }
+        delay(delayMillis)
         val headers = Headers.build {
             append(HttpHeaders.ContentType, "application/json")
             if (status.value in 300..399) append(HttpHeaders.Location, "https://other.example/collect")
@@ -46,6 +51,17 @@ class KtorAiProviderTest {
             put("content", """{"summary":"Начните спокойно","recommendations":[{"title":"Маленький шаг","explanation":"Задач пока нет"}]}""")
         } } }
     }.toString()
+
+    @Test fun reasoningRequestOverridesTheGenericClientTimeoutAndRemainsCancellable() = providerTest {
+        val engine = RecordingEngine(success, delayMillis = 80)
+        val provider = KtorAiProvider { HttpClient(engine) { install(HttpTimeout) { requestTimeoutMillis = 1 } } }
+        assertEquals("Начните спокойно", provider.analyze(settings, AnalysisGoal.DAY_PLAN, context).summary)
+        val waiting = RecordingEngine(success, delayMillis = 10_000)
+        val job = async { KtorAiProvider { HttpClient(waiting) }.analyze(settings, AnalysisGoal.DAY_PLAN, context) }
+        while (waiting.calls == 0) yield()
+        job.cancelAndJoin()
+        assertTrue(job.isCancelled)
+    }
 
     @Test fun postsExactPreviewAndParsesStructuredResult() = providerTest {
         val engine = RecordingEngine(success)
