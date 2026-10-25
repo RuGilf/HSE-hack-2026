@@ -18,7 +18,8 @@ internal fun MonthlyBudgetCard(month: String, currency: String, spent: Long?, bu
                     val remaining = remainingBudget(budget, spent)
                     Text("${formatMoney(spent, currency)} из ${formatMoney(budget, currency)}")
                     LinearProgressIndicator(progress = { expenseShare(spent, budget) }, modifier = Modifier.fillMaxWidth(),
-                        color = if (remaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                        color = if (remaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.outlineVariant)
                     Text((if (remaining < 0) "Превышение: " else "Остаток: ") +
                         formatMoney(if (remaining < 0) -remaining else remaining, currency),
                         color = if (remaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
@@ -42,7 +43,7 @@ internal fun CategoryChart(summary: ExpenseSummary, currency: String) {
                         Text(formatMoney(amount, currency))
                     }
                     LinearProgressIndicator(progress = { expenseShare(amount, summary.totalMinor) },
-                        modifier = Modifier.fillMaxWidth().height(8.dp))
+                        modifier = Modifier.fillMaxWidth().height(8.dp), trackColor = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }

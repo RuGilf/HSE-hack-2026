@@ -1,7 +1,7 @@
 # Lifety: parallel work contract
 
-Read `docs/CONTRACTS.md` and `README.md` before editing. This baseline contains
-Core & Planner P0 (SQLite repositories, tasks, calendar, navigation and DI).
+Read `docs/CONTRACTS.md` and `README.md` before editing. This checkout integrates Core & Planner P0, Finance/Notifications, Dashboard,
+manual Health and opt-in AI (shared SQLite repositories, navigation and DI).
 Keep feature work within the current user-authorized scope.
 
 - Codex 1 owns core, database, tasks, calendar, root navigation, all Gradle files,

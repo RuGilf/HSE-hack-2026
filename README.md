@@ -1,10 +1,11 @@
-# Lifety — Core, Planner & Finance
+# Lifety — Core, Planner, Finance & Assistant
 
 Kotlin Multiplatform + Compose Multiplatform, Android-first. Реализованы локальные
 SQLDelight-репозитории, задачи, календарь, общий DI и Compose Navigation.
-Finance объединён из `origin/feature/finance` (`847f405`): ручные расходы,
-сводки и подтверждённый импорт уведомлений подключены к общей SQLite.
-Dashboard, Assistant и Health пока остаются входами третьего агента.
+Finance обновлён до `origin/feature/finance` (`c703a1f`): CRUD, периоды,
+категории, месячный лимит и подтверждённый импорт уведомлений.
+Из `origin/feature/assistant` (`e30a688`) подключены обзор локальных данных,
+ручной ввод сна/шагов и опциональный AI с явным предпросмотром контекста.
 Текущая интеграция описана в [docs/INTEGRATION_STATUS.md](docs/INTEGRATION_STATUS.md).
 
 Рабочая ветка: **feature/core**, worktree: `/Users/rugilf/Projects/lifety-core`.
@@ -49,9 +50,16 @@ APK относительно корня worktree:
   анимированный маскот Lifety. Задачи и расходы редактируются в ModalBottomSheet.
 - Пять разделов: Главная, План, Финансы, Здоровье, Ассистент. Задачи и календарь
   переключаются внутри Плана; настройки доступны в верхней панели.
-- Finance: ручное добавление/редактирование/удаление расходов, период и валюта,
-  категории и сводки, сессионный бюджет. Банковские уведомления сохраняются
+- Finance: ручное добавление/редактирование/удаление расходов, день/неделя/месяц,
+  валюта, категории с диаграммами и сводки, месячный лимит в сессии экрана. Банковские уведомления сохраняются
   только после подтверждения. Демо-уведомление работает без системного доступа.
+- Главная: сегодняшние задачи и дедлайны, суммы текущего месяца отдельно по валютам,
+  последние показатели здоровья. Без стартовых вымышленных данных.
+- Здоровье: ручной ввод часов/минут сна и шагов с сохранением в общей SQLite.
+- Assistant: явный выбор категорий данных, предпросмотр неизменяемого JSON-контекста,
+  затем запрос к выбранному HTTPS chat/completions API. Нужны свои ключ и модель.
+  Разрешения выключены по умолчанию; ключ только в памяти процесса. Автоматических
+  запросов и изменений задач по ответу AI нет.
 - Android notification listener зарегистрирован в Manifest. Чтение выбранных
   банков включается пользователем через отдельное системное разрешение.
 - `TaskRepository`, `ExpenseRepository`, `HealthRepository` сохраняют данные
@@ -64,7 +72,8 @@ APK относительно корня worktree:
 
 Модели и публичные repository interfaces не изменены. Формат SQLite-таблиц и
 schema version 1 сохранены: на этом этапе добавлены запросы, миграция не нужна.
-Нет сервера, регистрации, облачной БД, Firebase, AI-реализации и внешних календарей.
+Нет сервера, регистрации, облачной БД, Firebase и внешних календарей.
+Health Connect/HealthKit не подключены; показатели вводятся вручную.
 Planner P1 (напоминания о дедлайнах, повторы, приоритеты, длительность) не реализован.
 
 ## Структура кода
@@ -100,7 +109,7 @@ shared/src/commonMain/kotlin/ru/lifety/
     tasks/{TasksScreen,TaskEditorScreen,TaskEditorViewModel}.kt
     calendar/CalendarScreen.kt
     finance/                                  Expenses + confirmed imports
-    dashboard/, assistant/, health/            Third agent entries
+    dashboard/, assistant/, health/            Local overview, opt-in AI, health
 shared/src/commonMain/sqldelight/ru/lifety/database/Lifety.sq
 shared/src/androidMain/                        SQLite/HTTP platform drivers
 shared/src/iosMain/                            Drivers + MainViewController
@@ -133,7 +142,8 @@ Production entry points передают реальный набор; `null` о�
 
 Codex 2 владеет Finance/Notifications; Codex 3 — Dashboard/Assistant/Health/AI.
 Новые зависимости и изменения Manifest/схемы/routes согласуются с Codex 1.
-От них не требуется ничего для работоспособности текущего Planner P0.
+Все опубликованные экраны уже подключены к общим репозиториям.
+AI требует пользовательского ключа/модели, остальные функции работают локально.
 Finance listener уже зарегистрирован. Он не требует репозитория в сервисе:
 публикует неподтверждённые предложения в общую очередь, а экран сохраняет
 подтверждённые расходы через `LocalRepositories.current.expenses`.
@@ -152,7 +162,8 @@ Android SDK **37**, Build Tools **36.0.0**, Xcode **27.1**.
 ```
 
 - Android debug/release assembly и lint — **BUILD SUCCESSFUL**.
-- **34 host tests: 0 failures, 0 errors, 0 skipped**: 13 Core/Planner и 21 Finance/Notifications.
+- **71 host tests: 0 failures, 0 errors, 0 skipped**: Core/Planner, Finance/Notifications,
+  Dashboard/Health и AI-контракты/приватность/HTTP fixtures.
 - Проверены реактивные insert/update/delete, полная замена nullable полей,
   стабильная сортировка, latest health по максимальному timestamp,
   точность денег >2⁵³, закрытие/повторное открытие файловой SQLite для всех
@@ -179,8 +190,19 @@ arm64**: установка и холодный запуск APK, создани
 доступность сохранения при открытой клавиатуре. Дизайн-контракт фиксирован в
 `docs/DESIGN_SYSTEM.md`; модели и схема БД не менялись.
 
+После нового объединения опубликованных веток повторены Android build/lint,
+71 host test и iOS Simulator arm64 compile. Разрешены конфликты Finance UI:
+новая аналитика работает с существующими неоновой темой, FAB, DatePicker и sheets.
+В трёх iOS-адаптерах третьего агента исправлены фабрики NSDate.
+На Android API 35 проверены Dashboard с реальной задачей, сводки и месячный лимит
+Finance, запись сна 7 ч 30 мин/8000 шагов и восстановление после остановки процесса,
+AI-предпросмотр с разрешёнными только задачами без отправки в сеть.
+Локальная `feature/assistant` (`e63b63c`) расходится с опубликованной `e30a688`:
+её альтернативный mock-AI/root DI не смешивались с опубликованным opt-in API.
+
 Не проверены физический Android, API 24–25 runtime, реальный банковский push и
-системный notification access, iOS framework linking/runtime/device arm64.
+системный notification access, реальный запрос к AI-провайдеру с ключом,
+iOS framework linking/runtime/device arm64.
 Несохранённые черновики и неподтверждённые notification suggestions могут теряться
 после завершения процесса; сохранённые данные остаются в SQLite.
 

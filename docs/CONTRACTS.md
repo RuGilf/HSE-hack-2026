@@ -6,9 +6,11 @@ Core & Planner P0 реализован в ветке `feature/core`, worktree
 `/Users/rugilf/Projects/lifety-core`. Основной репозиторий:
 `/Users/rugilf/Projects/HSE-hack-2026`; слияние в main не выполняется этой задачей.
 Реализованы SQLite-репозитории всех трёх доменов, задачи, календарь, DI и навигация.
-Finance интегрирован из `origin/feature/finance` (`847f405`): его экран использует
-общий expenses repository. В iOS-адаптере исправлена совместимость NSDate factory.
-Dashboard, Assistant и Health остаются точками интеграции третьего агента.
+Finance интегрирован до `origin/feature/finance` (`c703a1f`): его экран использует
+общий expenses repository. Dashboard, Assistant и Health подключены из
+`origin/feature/assistant` (`e30a688`). Их публичные screen signatures сохранены.
+В iOS-адаптерах исправлена совместимость NSDate factory. Локальная альтернативная
+`feature/assistant` (`e63b63c`) не объединялась: это другая mock-AI/DI реализация.
 Два Gradle-модуля: `:androidApp` (запуск Android) и `:shared` (KMP, включая Compose).
 Границы функций — каталоги и Kotlin-пакеты внутри `:shared`, не отдельные
 Gradle-модули. Это сокращает настройку и число общих файлов при параллельной работе.
@@ -289,8 +291,15 @@ dashboard/assistant работают с общими моделями и реп�
 OkHttp на Android, Darwin на iOS, JSON ContentNegotiation, `expectSuccess = true`,
 таймаут соединения 15 с, запроса и сокета 30 с. Владелец клиента закрывает его.
 Фабрика не задаёт URL, ключ, AI provider и не отправляет запросов при запуске.
-Codex 3 размещает будущую AI-логику в `feature/assistant/ai/**`, использует фабрику;
+Codex 3 размещает AI-логику в `feature/assistant/ai/**`, использует фабрику;
 новые общие зависимости запрашивает у Codex 1. API-ключи не коммитить.
+`AiProvider`/`KtorAiProvider`, `ContextBuilder`, `AssistantController` реализованы
+в feature-пакете без изменения Core. Разрешения всех категорий default-off,
+preview фиксирует JSON до явного Analyze; ключ хранится только в памяти процесса.
+Никаких записей в репозитории из AI. Полные контракты и ограничения —
+`C/feature/assistant/ai/README.md`. Health использует `HealthRepository.update`,
+Dashboard подписывается на все три общих repository Flow. Health Connect и
+HealthKit не подключены, новых permissions/Gradle-зависимостей нет.
 
 Android notification adapter реализован Codex 2 в
 `ru.lifety.platform.notifications`. `ExpenseNotificationListener` зарегистрирован
