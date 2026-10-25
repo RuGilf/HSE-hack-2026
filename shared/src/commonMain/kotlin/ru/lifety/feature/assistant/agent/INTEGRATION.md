@@ -6,6 +6,29 @@
 
 ## Готовый экран приложения
 
+Дополнение: ответы и сохранённые разборы отображаются через Material 3
+multiplatform-markdown-renderer 0.46.0. Зависимость разрешена пользователем отдельно.
+История подключена через HealthRepository.observeAll из свежего main 7dd6c09.
+Кнопка подключения показывает
+«Сохранено» и переход «К чату» после успешной настройки; доступность провайдера
+проверяется реальной отправкой, сохранение само по себе запрос не делает.
+На предоставленном OpenRouter/nvidia/nemotron-3-ultra-550b-a55b:free прошёл
+реальный Connect -> Send через AgentChatController. Ключ только в env теста.
+Совместный прогон поверх main 7dd6c09: Android build/lint, common metadata и
+iOS Simulator source compile успешны; 154 host tests, 147 passed, 7 skipped
+(6 opt-in live и symlink Windows). Отдельно live Connect -> Send прошёл на
+предоставленном OpenRouter. Исправлено падение раскрытия действий при неверном
+типе path от модели; cancel -> повторная отправка -> reopen покрыты HTTP-тестом.
+
+Health читает data/health/history/*.json, а не один latest. В источнике указан
+deviceTimeZone. Android Health Connect из main предлагает отдельный импорт до 30
+календарных дней с предпросмотром; пустые дни пропускаются, текущий
+день неполный. Сон агрегируется в пределах календарного дня, это не список
+отдельных ночных сессий. При обновлении APK повторите явный импорт: старое
+однодневное чтение не содержит историю. Одинаковые timestamps заменяются,
+повторные текущие наблюдения группируются по дню при анализе. Batch save выполняет
+общий updateAll атомарно; отдельного хранилища агента для здоровья нет.
+
 AssistantScreen использует AgentChatController и rememberAgentRuntime (Android/iOS),
 получает тот же LocalRepositories. Корневой DI и маршрут assistant менять не надо.
 Старый AssistantController/одноразовый AI оставлен для совместимости, экран его
