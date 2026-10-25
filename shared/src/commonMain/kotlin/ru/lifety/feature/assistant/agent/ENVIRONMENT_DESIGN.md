@@ -1,9 +1,10 @@
 # Lifety: local agent workspace
 
-Status: proposed revision after the user's workspace clarification, 2026-10-25.
+Status: implemented direction after the user's workspace clarification, 2026-10-25.
 Approved constraints: one APK, no Termux, Kotlin harness, configurable
-OpenAI-compatible LLM API. JavaScript is a proposed execution language, not yet
-a user requirement. Existing kernel scaffolding is not a finished agent.
+OpenAI-compatible LLM API. User subsequently approved the QuickJS dependency and
+instructed this branch to provide only the agent/API, leaving UI to another agent.
+Integration contract and verified limits are described in INTEGRATION.md.
 
 ## Intent
 
@@ -48,7 +49,7 @@ workspace/
   schemas/                   generated data descriptions and script API
   data/<source>/             permission-scoped, read-only JSON/JSONL snapshots
   memory/profile.json        confirmed facts with source, date and validity
-  memory/notes/              agent hypotheses/notes, explicitly unconfirmed
+  notes/                     agent hypotheses/progress, explicitly unconfirmed
   skills/<name>/SKILL.md      packaged, reviewed instructions loaded on demand
   scripts/                   agent-written analysis programs
   scratch/                   temporary intermediate data
@@ -57,7 +58,7 @@ workspace/
 
 The application owns `INDEX.md`, `schemas/`, `data/`, `skills/` and confirmed
 memory. The agent can freely edit `scripts/`, `scratch/`, `reports/` and its
-unconfirmed notes. The user can inspect and delete these files in the app.
+unconfirmed notes. The API lets the UI integrator expose inspection/deletion.
 Writing a note must never silently change authoritative user preferences.
 
 Files are snapshots and working artifacts, not another transaction database.
@@ -137,13 +138,12 @@ adding a new writable application capability requires a deliberate adapter.
 ## Integration and verification
 
 Implementation remains in the assistant feature and platform adapters in its
-own branch/worktree. Preserve `AssistantScreen(modifier: Modifier = Modifier)`.
-Reuse `LocalRepositories`; null shows source unavailable, not demo data.
+own branch/worktree. AssistantScreen and root navigation stay untouched. The
+integrator supplies Repositories from DI; null means unavailable, never demo data.
 
-Codex 1 needs to integrate the QuickJS dependency and host-test runtime variant.
-Prepare an exact patch; do not edit shared Gradle, Manifest, schema, contracts
-or root navigation on this branch without authorization. Direct local script
-execution needs no Android permission prompt or service registration.
+User approved applying the exact QuickJS dependency/host-test variant patch.
+It is the only shared Gradle change; Manifest, schema, contracts and navigation
+are untouched. Direct local script execution needs no service registration.
 
 Before choosing the runtime permanently, verify its published artifacts resolve
 with this project's Kotlin/AGP stack, its Android native binaries have suitable
