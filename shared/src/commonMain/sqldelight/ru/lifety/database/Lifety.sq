@@ -49,6 +49,9 @@ DELETE FROM expense WHERE id = ?;
 selectLatestHealth:
 SELECT * FROM healthSnapshot ORDER BY timestamp DESC LIMIT 1;
 
+selectHealthHistory:
+SELECT * FROM healthSnapshot ORDER BY timestamp DESC;
+
 upsertHealth:
 INSERT OR REPLACE INTO healthSnapshot(timestamp, sleepMinutes, steps)
 VALUES (?, ?, ?);

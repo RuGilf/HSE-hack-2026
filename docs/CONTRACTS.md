@@ -111,6 +111,8 @@ interface ExpenseRepository {
 interface HealthRepository {
     fun observeLatest(): Flow<HealthSnapshot?>
     suspend fun update(snapshot: HealthSnapshot)
+    fun observeAll(): Flow<List<HealthSnapshot>>
+    suspend fun updateAll(snapshots: List<HealthSnapshot>)
 }
 
 data class Repositories(
@@ -131,6 +133,12 @@ data class Repositories(
 - Health хранит snapshots по timestamp; `update` заменяет snapshot с тем же
   timestamp. `observeLatest` выбирает максимальный timestamp, не последнюю запись
   по моменту вызова. `null`-показатели заменяются, а не сливаются со старым snapshot.
+- `health.observeAll()` в SQLDelight выдаёт всю сохранённую историю в порядке
+  `timestamp DESC`; `updateAll()` выполняет пакет в одной транзакции (всё или ничего).
+  Для исходной совместимости интерфейс по умолчанию преобразует `observeLatest()`
+  в список и вызывает `update()` для каждого элемента пакета. Адаптеры с собственной
+  историей обязаны переопределить оба метода, как production SQLDelight.
+  Атомарность пакета гарантируется SQLDelight, а не default-адаптером.
 - Запись атомарна. Дисковые операции не блокируют UI; ошибки доходят до вызывающего
   кода, `CancellationException` не поглощается. Ошибки не маскируются пустыми списками.
 - Репозитории создаются один раз в composition root, общие для всех функций.
@@ -154,7 +162,7 @@ NativeSqliteDriver на iOS. `JdbcSqliteDriver` используется тол�
 `Boolean` и nullable `Int` имеют SQLDelight type projections.
 CRUD-запросы находятся в существующем `Lifety.sq`: `selectTasks`, `upsertTask`,
 `deleteTask`, `selectExpenses`, `upsertExpense`, `deleteExpense`,
-`selectLatestHealth`, `upsertHealth`. Формат таблиц и schema version 1 не изменены,
+`selectLatestHealth`, `selectHealthHistory`, `upsertHealth`. Формат таблиц и schema version 1 не изменены,
 миграция для этого этапа не требуется. Int-адаптеры подключаются в
 `createDatabase`, проверяют диапазон Int при чтении SQLite INTEGER.
 Сгенерированный код в `build/` не редактировать и не коммитить; дальнейшие
@@ -300,14 +308,17 @@ Codex 3 размещает AI-логику в `feature/assistant/ai/**`, исп�
 в feature-пакете без изменения Core. Разрешения всех категорий default-off,
 preview фиксирует JSON до явного Analyze; ключ хранится только в памяти процесса.
 Никаких записей в репозитории из AI. Полные контракты и ограничения —
-`C/feature/assistant/ai/README.md`. Health использует `HealthRepository.update`,
-Dashboard подписывается на все три общих repository Flow. Android Health Connect импортирует сон и шаги только по явному действию,
-затем сохраняет точный предпросмотр через существующий HealthRepository.update
-после подтверждения. Разрешения AI от этого не меняются. На iOS остаётся ручной ввод;
+`C/feature/assistant/ai/README.md`. Health наблюдает `HealthRepository.observeAll()`;
+ручной ввод использует `update`, подтверждённый пакет — `updateAll`.
+Dashboard сохраняет прежнюю подписку на последние показатели. Android Health Connect
+читает дневные агрегаты сна/шагов за 30 дней только по явному действию, сохраняет
+пакет после предпросмотра и подтверждения. Модель неизменна. Правила группировки,
+совместимости и повторного импорта — в `docs/HEALTH_HISTORY.md`. Разрешения AI от этого не меняются. На iOS остаётся ручной ввод;
 HealthKit не подключён. Android-only connect-client 1.2.0-alpha06 использует
 READ_SLEEP/READ_STEPS и Activity объяснения. SDK и его bound service включаются
 только на API 28+, minSdk приложения остаётся 24 с точечным overrideLibrary.
-Новых записей в Health Connect, фонового чтения и изменений SQL/DI нет.
+Записей в Health Connect, фонового чтения и новых разрешений нет. Добавлен только
+SQL-запрос истории; таблицы, schema version и DI прежние.
 Точный workflow и ограничения — C/feature/health/INTEGRATION.md.
 
 Android notification adapter реализован Codex 2 в

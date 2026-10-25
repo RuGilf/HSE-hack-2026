@@ -9,6 +9,8 @@ import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -87,9 +89,9 @@ internal actual fun HealthConnectSection(repository: HealthRepository?, enabled:
                         try { requesting = true; launcher.launch(healthPermissions(state.selected)) }
                         catch (_: Exception) { requesting = false; controller.showError("Не удалось открыть запрос разрешений. Откройте настройки Health Connect.") }
                     }, enabled = active && state.selected.isNotEmpty()) { Text("Настроить разрешения") }
-                    Button(onClick = controller::readPreview,
-                        enabled = active && state.selected.intersect(state.granted).isNotEmpty()) { Text("Прочитать показатели") }
-                    Text("Сон — за последние 24 часа; шаги — с начала сегодняшнего дня в часовом поясе устройства. Читаются только выбранные и разрешённые показатели.", style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = { controller.readHistoryPreview() },
+                        enabled = active && state.selected.intersect(state.granted).isNotEmpty()) { Text("Прочитать за 30 дней") }
+                    Text("Сон и шаги — по календарным дням за последние 30 дней. Читаются только выбранные и разрешённые показатели. Доступная глубина зависит от разрешений Health Connect; более старые локальные записи сохраняются.", style = MaterialTheme.typography.bodySmall)
                     Text("Если записей нет, включите передачу сна и шагов в Health Connect в совместимом приложении часов или фитнеса. Синхронизируйте устройство и повторите чтение.", style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = {
                         openHealthIntent(context, Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS), controller)
@@ -104,12 +106,23 @@ internal actual fun HealthConnectSection(repository: HealthRepository?, enabled:
             state.message?.let { Text(it, color = MaterialTheme.colorScheme.onSecondaryContainer) }
             state.preview?.let { preview ->
                 HorizontalDivider()
-                Text("Проверить перед сохранением", style = MaterialTheme.typography.titleMedium)
-                Text("Сон: ${preview.snapshot.sleepMinutes?.let { "${it / 60} ч ${it % 60} мин" } ?: "нет данных / нет доступа"}")
-                Text("Шаги: ${preview.snapshot.steps?.toString() ?: "нет данных / нет доступа"}")
-                Text("Получено: ${healthRecordedAt(preview.snapshot.timestamp)}", style = MaterialTheme.typography.bodySmall)
-                Text("Эта запись заменит последние отображаемые показатели. Пустое значение станет «неизвестно»; старые значения не подмешиваются.")
-                Button(onClick = controller::savePreview, enabled = active) { Text("Сохранить этот снимок") }
+                Text(if (preview.periodDays != null) "Импорт: ${preview.snapshots.size} дней" else "Проверить перед сохранением", style = MaterialTheme.typography.titleMedium)
+                if (preview.periodDays != null) {
+                    Text("${healthRecordedAt(preview.snapshots.first().timestamp)} — ${healthRecordedAt(preview.snapshots.last().timestamp)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Сон: ${preview.snapshots.count { it.sleepMinutes != null }} дней · Шаги: ${preview.snapshots.count { it.steps != null }} дней")
+                    Column(Modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        preview.snapshots.asReversed().forEach { row ->
+                            Text("${healthRecordedAt(row.timestamp)}\nСон: ${sleepLabel(row.sleepMinutes)} · Шаги: ${row.steps?.toString() ?: "Нет данных"}", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                if (preview.periodDays == null) {
+                    Text("Сон: ${preview.snapshot.sleepMinutes?.let { "${it / 60} ч ${it % 60} мин" } ?: "нет данных / нет доступа"}")
+                    Text("Шаги: ${preview.snapshot.steps?.toString() ?: "нет данных / нет доступа"}")
+                    Text("Получено: ${healthRecordedAt(preview.snapshot.timestamp)}", style = MaterialTheme.typography.bodySmall)
+                }
+                Text(if (preview.periodDays != null) "Записи дополнят локальную историю. Повторный импорт завершённых дней обновит те же дни. Пустые значения не удаляют сохранённые показатели." else "Эта запись заменит последние отображаемые показатели. Пустое значение станет «неизвестно»; старые значения не подмешиваются.")
+                Button(onClick = controller::savePreview, enabled = active) { Text(if (preview.periodDays != null) "Сохранить историю" else "Сохранить этот снимок") }
                 TextButton(onClick = controller::discardPreview, enabled = active) { Text("Отменить импорт") }
             }
             Text(HEALTH_CONNECT_PRIVACY, style = MaterialTheme.typography.bodySmall)

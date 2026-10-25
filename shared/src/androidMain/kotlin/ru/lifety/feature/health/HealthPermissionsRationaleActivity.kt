@@ -23,7 +23,7 @@ class HealthPermissionsRationaleActivity : ComponentActivity() {
                         Text("Lifety и ваши показатели", style = MaterialTheme.typography.headlineLarge)
                         Text(HEALTH_CONNECT_PRIVACY, style = MaterialTheme.typography.bodyLarge)
                         Text("Вы можете выдать доступ только к одному показателю и отозвать его в Health Connect в любой момент. Уже сохранённые в Lifety снимки после отзыва доступа остаются на устройстве.")
-                        Text("Для импорта откройте «Здоровье» в Lifety: настройте разрешения, нажмите «Прочитать показатели», проверьте результат и подтвердите сохранение. Если записей нет, локальные данные не заменяются.")
+                        Text("Для импорта откройте «Здоровье» в Lifety: настройте разрешения, нажмите «Прочитать за 30 дней», проверьте историю по дням и подтвердите сохранение. Если записей нет, локальные данные не заменяются.")
                         Button(onClick = { finish() }, modifier = Modifier.fillMaxWidth().heightIn(min = LifetySpacing.ControlHeight)) { Text("Понятно") }
                     }
                 }

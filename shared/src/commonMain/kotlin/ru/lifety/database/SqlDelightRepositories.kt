@@ -58,8 +58,17 @@ class SqlDelightHealthRepository(
     override fun observeLatest(): Flow<HealthSnapshot?> = queries.selectLatestHealth(::HealthSnapshot)
         .asFlow().mapToOneOrNull(dispatcher)
 
+    override fun observeAll(): Flow<List<HealthSnapshot>> = queries.selectHealthHistory(::HealthSnapshot)
+        .asFlow().mapToList(dispatcher)
+
     override suspend fun update(snapshot: HealthSnapshot) = withContext(dispatcher) {
         queries.upsertHealth(snapshot.timestamp, snapshot.sleepMinutes, snapshot.steps)
         Unit
+    }
+
+    override suspend fun updateAll(snapshots: List<HealthSnapshot>) = withContext(dispatcher) {
+        queries.transaction {
+            snapshots.forEach { queries.upsertHealth(it.timestamp, it.sleepMinutes, it.steps) }
+        }
     }
 }

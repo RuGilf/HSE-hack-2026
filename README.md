@@ -90,9 +90,11 @@ QuickJS-расчёты, история/память и предложения и
   только после подтверждения. Демо-уведомление работает без системного доступа.
 - Главная: сегодняшние задачи и дедлайны, суммы текущего месяца отдельно по валютам,
   последние показатели здоровья. Без стартовых вымышленных данных.
-- Здоровье: ручной ввод часов/минут сна и шагов с сохранением в общей SQLite.
-  Android 9+ также предлагает импорт через Health Connect: отдельные разрешения
-  чтения, предпросмотр и подтверждение. При отсутствии провайдера ручной ввод доступен.
+- Здоровье: вся локальная история сна и шагов, графики за 7/30 дней и всё время,
+  средние по дням с данными, выбор дня и список записей. Ручной ввод — с датой.
+  Android 9+ предлагает явный импорт дневных итогов Health Connect за 30 дней
+  с предпросмотром и подтверждением. Пропуски не превращаются в нули, повторные
+  накопительные замеры не складываются. Подробности — [docs/HEALTH_HISTORY.md](docs/HEALTH_HISTORY.md).
 - Assistant: явный выбор категорий данных, предпросмотр неизменяемого JSON-контекста,
   затем запрос к выбранному HTTPS chat/completions API. Нужны свои ключ и модель.
   Разрешения выключены по умолчанию; ключ только в памяти процесса. Автоматических
@@ -107,11 +109,12 @@ QuickJS-расчёты, история/память и предложения и
 - NavHost сохраняет верхние routes, back stack и экранные состояния;
   редактор получает id задачи через typed route, Back возвращает к источнику.
 
-Модели и публичные repository interfaces не изменены. Формат SQLite-таблиц и
+Модели и прежние методы репозиториев сохранены. HealthRepository дополнен
+`observeAll()` и `updateAll()` с совместимыми реализациями по умолчанию. Формат SQLite-таблиц и
 schema version 1 сохранены: на этом этапе добавлены запросы, миграция не нужна.
 Нет сервера, регистрации, облачной БД, Firebase и внешних календарей.
-Health Connect подключён только на Android 9+: сон за последние 24 часа, шаги
-с начала локального дня. Фонового импорта нет. На iOS остаётся ручной ввод;
+Health Connect подключён только на Android 9+: дневные итоги сна и шагов
+за последние 30 календарных дней, включая текущий неполный день. Фонового импорта нет. На iOS остаётся ручной ввод;
 HealthKit не подключён. Особенности SDK и проверок — в
 `shared/src/commonMain/kotlin/ru/lifety/feature/health/INTEGRATION.md`.
 Planner P1 (напоминания о дедлайнах, повторы, приоритеты, длительность) не реализован.
@@ -136,7 +139,7 @@ shared/src/commonMain/kotlin/ru/lifety/
   core/
     di/AppContainer.kt                        Driver + all repositories
     model/{Task,Expense,HealthSnapshot}.kt      Unchanged
-    repository/*.kt                           Unchanged public interfaces
+    repository/*.kt                           Stable methods + health history API
     navigation/PlannerNavigation.kt           Editor integration point
     planner/TaskListViewModel.kt               Shared StateFlow state
     time/PlannerDates.kt                      KMP date/time and day selection
@@ -200,6 +203,10 @@ Android SDK **37**, Build Tools **36.0.0**, Xcode **27.1**.
 ./gradlew :androidApp:build :shared:testAndroidHostTest
 ./gradlew :shared:compileKotlinIosSimulatorArm64 :androidApp:build :shared:testAndroidHostTest
 ```
+
+Обновление истории здоровья: Android build/lint, iOS Simulator arm64 и common
+metadata скомпилированы; **135 тестов прошли, 3 live LLM tests пропущены** без ключей.
+Команда и ограничения — [docs/HEALTH_HISTORY.md](docs/HEALTH_HISTORY.md).
 
 После интеграции Health Connect (`14a4311`) повторена полная команда Android build,
 host tests и iOS compile: **92 теста без failures/errors/skipped**.

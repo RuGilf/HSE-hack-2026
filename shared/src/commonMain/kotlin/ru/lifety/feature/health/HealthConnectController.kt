@@ -23,12 +23,17 @@ internal interface HealthConnectGateway {
     suspend fun availability(): HealthConnectAvailability
     suspend fun grantedMetrics(): Set<HealthMetric>
     suspend fun readSnapshot(metrics: Set<HealthMetric>, capturedAt: Long): HealthSnapshot
+    suspend fun readHistory(metrics: Set<HealthMetric>, capturedAt: Long, days: Int): List<HealthSnapshot> =
+        listOf(readSnapshot(metrics, capturedAt))
 }
 
 internal data class HealthImportPreview(
     val snapshot: HealthSnapshot,
     val baseline: HealthSnapshot?,
     val metrics: Set<HealthMetric>,
+    val snapshots: List<HealthSnapshot> = listOf(snapshot),
+    val baselineHistory: List<HealthSnapshot>? = null,
+    val periodDays: Int? = null,
 )
 
 internal data class HealthConnectUiState(
@@ -98,7 +103,33 @@ internal class HealthConnectController(
         }
     }
 
-    /** Preview and confirmation are separate. Never merge old values into a new snapshot. */
+    fun readHistoryPreview(days: Int = 30) {
+        val repo = repository ?: return
+        if (state.value.busy || state.value.selected.isEmpty()) return
+        require(days in 1..30)
+        val selected = state.value.selected.toSet()
+        operation {
+            mutableState.value = state.value.copy(preview = null)
+            val availability = gateway.availability()
+            val granted = if (availability == HealthConnectAvailability.AVAILABLE) gateway.grantedMetrics() else emptySet()
+            mutableState.value = state.value.copy(availability = availability, granted = granted)
+            val allowed = selected.intersect(granted)
+            if (allowed.isEmpty()) {
+                showError("Разрешите чтение выбранных показателей в Health Connect.")
+                return@operation
+            }
+            val baseline = repo.observeAll().first().sortedBy { it.timestamp }
+            val rows = gateway.readHistory(allowed, now(), days).map {
+                it.copy(sleepMinutes = it.sleepMinutes.takeIf { HealthMetric.SLEEP in allowed }, steps = it.steps.takeIf { HealthMetric.STEPS in allowed })
+            }.filter { it.sleepMinutes != null || it.steps != null }.sortedBy { it.timestamp }
+            require(rows.map { it.timestamp }.distinct().size == rows.size)
+            require(rows.all { (it.sleepMinutes == null || it.sleepMinutes in 0..1560) && (it.steps == null || it.steps >= 0) })
+            if (rows.isEmpty()) mutableState.value = state.value.copy(message = "За последние $days дней записей нет. Локальная история сохранена без изменений.")
+            else mutableState.value = state.value.copy(preview = HealthImportPreview(rows.last(), baseline.lastOrNull(), allowed, rows, baseline, days))
+        }
+    }
+
+    /** Confirmed history keeps known fields at the same key; legacy snapshot import still replaces. */
     fun savePreview() {
         val repo = repository ?: return
         val preview = state.value.preview ?: return
@@ -111,13 +142,22 @@ internal class HealthConnectController(
                 showError("Доступ изменился. Проверьте разрешения и заново прочитайте показатели.")
                 return@operation
             }
-            if (repo.observeLatest().first() != preview.baseline) {
+            val changed = if (preview.baselineHistory != null) repo.observeAll().first().sortedBy { it.timestamp } != preview.baselineHistory
+                else repo.observeLatest().first() != preview.baseline
+            if (changed) {
                 mutableState.value = state.value.copy(preview = null)
                 showError("Локальные показатели изменились. Обновите предпросмотр перед импортом.")
                 return@operation
             }
-            repo.update(preview.snapshot)
-            mutableState.value = state.value.copy(preview = null, message = "Снимок Health Connect сохранён на устройстве.")
+            if (preview.baselineHistory != null) {
+                val existing = preview.baselineHistory.associateBy { it.timestamp }
+                repo.updateAll(preview.snapshots.map { row ->
+                    val old = existing[row.timestamp]
+                    row.copy(sleepMinutes = row.sleepMinutes ?: old?.sleepMinutes, steps = row.steps ?: old?.steps)
+                })
+            } else repo.update(preview.snapshot)
+            mutableState.value = state.value.copy(preview = null, message = if (preview.periodDays != null)
+                "История Health Connect сохранена: ${preview.snapshots.size} дней." else "Снимок Health Connect сохранён на устройстве.")
         }
     }
 

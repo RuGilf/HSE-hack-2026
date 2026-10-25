@@ -7,6 +7,8 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateRequest
+import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
+import androidx.health.connect.client.aggregate.AggregateMetric
 import androidx.health.connect.client.time.TimeRangeFilter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,6 +16,9 @@ import ru.lifety.core.model.HealthSnapshot
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.Period
 
 internal data class HealthReadWindow(val capturedAt: Instant, val stepsStart: Instant, val sleepStart: Instant)
 
@@ -28,7 +33,11 @@ internal interface HealthConnectApi {
     suspend fun grantedMetrics(): Set<HealthMetric>
     suspend fun steps(start: Instant, end: Instant): Long?
     suspend fun sleep(start: Instant, end: Instant): Duration?
+    suspend fun daily(metrics: Set<HealthMetric>, start: LocalDateTime, end: LocalDateTime): List<DailyHealthValue> =
+        error("Daily aggregate adapter is unavailable")
 }
+
+internal data class DailyHealthValue(val date: LocalDate, val sleep: Duration?, val steps: Long?)
 
 internal fun healthPermissions(metrics: Set<HealthMetric>): Set<String> = metrics.map { metric ->
     when (metric) {
@@ -61,6 +70,30 @@ internal class AndroidHealthConnectGateway(
             }?.toMinutes()?.toInt()
         } else null
         HealthSnapshot(capturedAt, sleep, steps)
+    }
+
+    override suspend fun readHistory(metrics: Set<HealthMetric>, capturedAt: Long, days: Int): List<HealthSnapshot> = permissionSafe {
+        require(days in 1..30 && metrics.isNotEmpty())
+        check(api.availability() == HealthConnectAvailability.AVAILABLE)
+        metrics.forEach { requirePermission(it) }
+        val zone = zone()
+        val end = Instant.ofEpochMilli(capturedAt).atZone(zone)
+        val start = end.toLocalDate().minusDays(days.toLong() - 1)
+        val buckets = api.daily(metrics, start.atStartOfDay(), end.toLocalDateTime())
+        metrics.forEach { requirePermission(it) }
+        require(buckets.map { it.date }.distinct().size == buckets.size)
+        buckets.map { bucket ->
+            require(!bucket.date.isBefore(start) && !bucket.date.isAfter(end.toLocalDate()))
+            val sleep = if (HealthMetric.SLEEP in metrics) bucket.sleep?.also {
+                require(!it.isNegative && it <= Duration.ofHours(26))
+            }?.toMinutes()?.toInt() else null
+            val steps = if (HealthMetric.STEPS in metrics) bucket.steps?.also {
+                require(it in 0..Int.MAX_VALUE.toLong())
+            }?.toInt() else null
+            // Finished days have a stable key. Today's changing cumulative reading is a new snapshot.
+            val timestamp = if (bucket.date == end.toLocalDate()) capturedAt else bucket.date.atStartOfDay(zone).toInstant().toEpochMilli()
+            HealthSnapshot(timestamp, sleep, steps)
+        }.filter { it.sleepMinutes != null || it.steps != null }.sortedBy { it.timestamp }
     }
 
     private suspend fun requirePermission(metric: HealthMetric) {
@@ -96,5 +129,16 @@ private class JetpackHealthConnectApi(private val context: Context) : HealthConn
     override suspend fun sleep(start: Instant, end: Instant): Duration? = withContext(Dispatchers.IO) {
         client.aggregate(AggregateRequest(metrics = setOf(SleepSessionRecord.SLEEP_DURATION_TOTAL),
             timeRangeFilter = TimeRangeFilter.between(start, end)))[SleepSessionRecord.SLEEP_DURATION_TOTAL]
+    }
+
+    override suspend fun daily(metrics: Set<HealthMetric>, start: LocalDateTime, end: LocalDateTime): List<DailyHealthValue> = withContext(Dispatchers.IO) {
+        if (start >= end) return@withContext emptyList()
+        val requested = buildSet<AggregateMetric<*>> {
+            if (HealthMetric.SLEEP in metrics) add(SleepSessionRecord.SLEEP_DURATION_TOTAL)
+            if (HealthMetric.STEPS in metrics) add(StepsRecord.COUNT_TOTAL)
+        }
+        client.aggregateGroupByPeriod(AggregateGroupByPeriodRequest(metrics = requested,
+            timeRangeFilter = TimeRangeFilter.between(start, end), timeRangeSlicer = Period.ofDays(1)))
+            .map { DailyHealthValue(it.startTime.toLocalDate(), it.result[SleepSessionRecord.SLEEP_DURATION_TOTAL], it.result[StepsRecord.COUNT_TOTAL]) }
     }
 }
