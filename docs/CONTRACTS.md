@@ -207,6 +207,9 @@ Finance notification service не обращается к БД: он публи�
 `LifetyMascot(modifier = Modifier, emotion = LifetyEmotion.Happy, animated = true)`
 доступен всем функциям без platform assets. Не дублировать цвета и drawing.
 Модели, репозитории, схема БД и feature entry signatures при редизайне не меняются.
+Android polish v2 использует стандартную M3 Typography, единые motion specs из
+`C/core/ui/LifetyMotion.kt`, компактные секции и сохранение черновиков при
+configuration change. Разрешения AI и процессное хранение ключа не менялись.
 
 ## Навигационные интеграционные точки
 

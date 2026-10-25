@@ -13,10 +13,10 @@ internal actual fun dashboardPeriod(now: Long): DashboardPeriod {
     components.day = 1
     val month = requireNotNull(calendar.dateFromComponents(components))
     val monthEnd = requireNotNull(calendar.dateByAddingUnit(NSCalendarUnitMonth, 1, month, 0u))
-    return DashboardPeriod(start.millis(), end.millis(), month.millis(), monthEnd.millis(), NSDateFormatter().apply { dateFormat = "EEEE, d MMMM" }.stringFromDate(date))
+    return DashboardPeriod(start.millis(), end.millis(), month.millis(), monthEnd.millis(), NSDateFormatter().apply { locale = NSLocale("ru_RU"); dateFormat = "EEEE, d MMMM" }.stringFromDate(date))
 }
 
 private fun NSDate.millis(): Long = (timeIntervalSince1970 * 1000).toLong()
 
-internal actual fun dashboardDate(timestamp: Long): String = NSDateFormatter().apply { dateFormat = "d MMM yyyy, HH:mm" }
+internal actual fun dashboardDate(timestamp: Long): String = NSDateFormatter().apply { locale = NSLocale("ru_RU"); dateFormat = "d MMM yyyy, HH:mm" }
     .stringFromDate(NSDate.dateWithTimeIntervalSince1970(timestamp / 1000.0))

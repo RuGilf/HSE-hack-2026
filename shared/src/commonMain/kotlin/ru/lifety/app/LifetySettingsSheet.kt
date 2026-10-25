@@ -1,66 +1,46 @@
 package ru.lifety.app
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import ru.lifety.core.ui.LifetyColors
-import ru.lifety.core.ui.LifetyIcon
-import ru.lifety.core.ui.LifetyMascot
-import ru.lifety.core.ui.LifetySymbol
+import kotlinx.coroutines.launch
+import ru.lifety.core.ui.*
 
-/** Only existing controls and truthful local information, without placeholder account toggles. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            Text("Настройки", style = MaterialTheme.typography.headlineMedium)
-            Card(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    LifetyMascot(Modifier.size(56.dp), animated = false)
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Неоновая тёмная", style = MaterialTheme.typography.titleMedium)
-                        Text("Единый стиль Lifety", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf(LifetyColors.Background, LifetyColors.Surface, LifetyColors.Accent).forEach { color ->
-                                androidx.compose.foundation.layout.Box(Modifier.size(14.dp).background(color, CircleShape))
-                            }
-                        }
-                    }
-                }
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Настройки", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                IconButton(onClick = { scope.launch { sheet.hide(); onDismiss() } }, modifier = Modifier.semantics { contentDescription = "Закрыть настройки" }) { LifetyIcon(LifetySymbol.Close) }
             }
-            Card(onClick = onFinance, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    LifetyIcon(LifetySymbol.Wallet, color = MaterialTheme.colorScheme.primary)
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Банковские уведомления", style = MaterialTheme.typography.titleMedium)
-                        Text("Доступ и подтверждение — в финансах", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            Text("Lifety · твой день в одном контексте", style = MaterialTheme.typography.titleSmall)
-            Text("Задачи и расходы хранятся на устройстве. Чтение банковских уведомлений включается только по твоему выбору.",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Готово") }
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                leadingContent = { LifetyMascot(Modifier.size(40.dp), animated = false) },
+                headlineContent = { Text("Lifety") }, supportingContent = { Text("Тёмная тема · зелёный акцент") },
+            )
+            ListItem(
+                modifier = Modifier.clickable { scope.launch { sheet.hide(); onFinance() } },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                leadingContent = { LifetyIcon(LifetySymbol.Wallet) },
+                headlineContent = { Text("Банковские уведомления") }, supportingContent = { Text("Выбор банков и доступ — в финансах") },
+                trailingContent = { LifetyIcon(LifetySymbol.Chevron) },
+            )
+            HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Задачи, расходы и показатели здоровья хранятся на устройстве. Данные для ИИ выбираются отдельно перед отправкой.",
+                modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

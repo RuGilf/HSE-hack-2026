@@ -18,12 +18,12 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
 
-enum class LifetySymbol { Home, Plan, Wallet, Heart, Assistant, Settings, Calendar, Plus, Close, Back }
+enum class LifetySymbol { Home, Plan, Wallet, Heart, Assistant, Settings, Calendar, Plus, Close, Back, More, Chevron, Check, Sleep, Steps }
 
 @Composable
 fun LifetyIcon(symbol: LifetySymbol, modifier: Modifier = Modifier, color: Color = LocalContentColor.current) {
     Canvas(modifier.size(24.dp)) {
-        val pen = Stroke(width = 1.7f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val pen = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         withTransform({ scale(size.width / 24f, size.height / 24f, Offset.Zero) }) {
             val path = Path()
             when (symbol) {
@@ -60,12 +60,28 @@ fun LifetyIcon(symbol: LifetySymbol, modifier: Modifier = Modifier, color: Color
                     drawLine(color, Offset(9f, 15f), Offset(15f, 15f), 1.7f, StrokeCap.Round)
                 }
                 LifetySymbol.Settings -> {
-                    drawCircle(color, 6f, Offset(12f, 12f), style = pen)
-                    drawCircle(color, 2f, Offset(12f, 12f), style = pen)
-                    repeat(8) { i ->
-                        val angle = i * kotlin.math.PI / 4
-                        drawLine(color, Offset(12f + cos(angle).toFloat() * 8f, 12f + sin(angle).toFloat() * 8f), Offset(12f + cos(angle).toFloat() * 10f, 12f + sin(angle).toFloat() * 10f), 1.7f, StrokeCap.Round)
+                    repeat(32) { i ->
+                        val angle = i * kotlin.math.PI / 16 - kotlin.math.PI / 2
+                        val radius = if (i % 4 == 0 || i % 4 == 3) 9.5f else 7.5f
+                        val x = 12f + cos(angle).toFloat() * radius
+                        val y = 12f + sin(angle).toFloat() * radius
+                        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                     }
+                    path.close()
+                    drawCircle(color, 3f, Offset(12f, 12f), style = pen)
+                }
+                LifetySymbol.More -> repeat(3) { drawCircle(color, 1.7f, Offset(12f, 5f + it * 7f)) }
+                LifetySymbol.Chevron -> { path.moveTo(9f, 6f); path.lineTo(15f, 12f); path.lineTo(9f, 18f) }
+                LifetySymbol.Check -> { path.moveTo(4f, 12f); path.lineTo(9f, 17f); path.lineTo(20f, 6f) }
+                LifetySymbol.Sleep -> {
+                    path.moveTo(18f, 18f); path.cubicTo(4f, 23f, 1f, 7f, 12f, 3f)
+                    path.cubicTo(8f, 11f, 13f, 16f, 18f, 18f)
+                }
+                LifetySymbol.Steps -> {
+                    drawOval(color, Offset(5f, 3f), Size(5f, 9f), style = pen)
+                    drawOval(color, Offset(14f, 10f), Size(5f, 9f), style = pen)
+                    drawLine(color, Offset(6f, 15f), Offset(9f, 15f), 2f, StrokeCap.Round)
+                    drawLine(color, Offset(15f, 22f), Offset(18f, 22f), 2f, StrokeCap.Round)
                 }
                 LifetySymbol.Plus -> { path.moveTo(12f, 5f); path.lineTo(12f, 19f); path.moveTo(5f, 12f); path.lineTo(19f, 12f) }
                 LifetySymbol.Close -> { path.moveTo(6f, 6f); path.lineTo(18f, 18f); path.moveTo(18f, 6f); path.lineTo(6f, 18f) }

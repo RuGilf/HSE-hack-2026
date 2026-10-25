@@ -1,5 +1,7 @@
 package ru.lifety.feature.tasks
 
+import androidx.compose.animation.core.tween
+import ru.lifety.core.ui.LifetyMotion
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -73,10 +75,10 @@ fun TasksScreen(modifier: Modifier = Modifier) {
         floatingActionButton = {
             if (state.tasks.isNotEmpty()) FloatingActionButton(onClick = { planner?.createTask() },
                 containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = androidx.compose.foundation.shape.CircleShape,
+                shape = MaterialTheme.shapes.large,
                 modifier = Modifier.semantics { contentDescription = "Добавить задачу" }) { LifetyIcon(LifetySymbol.Plus) }
         }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Твои задачи", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Text("${state.tasks.count { !it.isCompleted }} активных · ${state.tasks.count { it.isCompleted }} готово",
@@ -104,9 +106,11 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                                 onAction = if (filter == TaskFilter.COMPLETED) null else ({ planner?.createTask() }),
                             )
                         }
-                        items(tasks, key = { it.id }) { task ->
+                        items(tasks, key = { it.id }, contentType = { "task" }) { task ->
+                            androidx.compose.foundation.layout.Box(Modifier.animateItem(fadeInSpec = tween(LifetyMotion.Quick), placementSpec = tween(LifetyMotion.Standard), fadeOutSpec = tween(LifetyMotion.Quick))) {
                             TaskCard(task, task.id in state.busyIds, onOpen = { planner?.openTask(task.id) },
                                 onToggle = { model.toggle(task) }, onDelete = { pendingDelete = task })
+                            }
                         }
                     }
                 }

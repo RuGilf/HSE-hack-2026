@@ -1,6 +1,6 @@
-# Lifety — Neon design system v1
+# Lifety — Android / Material 3 design system v2
 
-Design update: 25 октября 2026. Общий контракт визуального языка всех функций.
+Design update: 25 октября 2026. Android polish на базе main `2518b8a`. Общий контракт визуального языка всех функций.
 [Исходный концепт пользователя](design/lifety-reference.png). Это референс, а не
 список обязательных новых функций и не источник реальных пользовательских данных.
 
@@ -10,6 +10,8 @@ Design update: 25 октября 2026. Общий контракт визуал�
 | --- | --- | --- |
 | Основной фон | `#101512` | `LifetyColors.Background` |
 | Карточки | `#1D2520` | `LifetyColors.Surface` |
+| Primary container | `#173C25` | `LifetyColors.PrimaryContainer` |
+| Secondary container | `#293C30` | `LifetyColors.SecondaryContainer` |
 | Приподнятая поверхность | `#263229` | `LifetyColors.SurfaceRaised` |
 | Акцент | `#35EF70` | `LifetyColors.Accent` |
 | Основной текст | `#F4F7F3` | `LifetyColors.TextPrimary` |
@@ -22,6 +24,8 @@ Design update: 25 октября 2026. Общий контракт визуал�
 `LifetyTheme.kt` назначает все роли Material 3, включая secondaryContainer и
 surface containers: стандартный фиолетовый акцент не должен возвращаться.
 Тема фиксированная тёмная; локальную светлую тему экраны не создают.
+Primary/secondary containers тёмные: selected chips и tonal controls не превращаются
+в большие неоновые плашки. Цвет content каждой роли соответствует её назначению.
 Android system bars, launcher mark и системный splash используют ту же палитру.
 
 Внутри функций используйте `MaterialTheme.colorScheme`, `shapes`, `typography`.
@@ -31,15 +35,16 @@ Android system bars, launcher mark и системный splash использу
 
 ## Размеры и типографика
 
-`LifetySpacing`: Screen 20 dp, Section 24 dp, Content 16 dp, Item 12 dp, Small 8 dp.
-Высота основного действия — 52 dp; круглая FAB — стандартная M3 56 dp.
-Card — радиус 20–24 dp, input — 16 dp, sheet — 28 dp сверху.
+`LifetySpacing`: Screen 16 dp, Section 24 dp, Content 16 dp, Item 12 dp, Small 8 dp.
+Основное действие — минимум 48 dp; FAB — M3 56 dp с rounded-square shape.
+Card — 16–20 dp, inputs — стандартные M3 4 dp, sheet — 28 dp сверху.
+Область выбора дня календаря — 48 dp. Минимальные интерактивные размеры M3 не отключаются.
 
-Шрифт — системный Sans Serif. H1 — 30/36 sp semibold, H2 — 26/32,
-app bar — 24/30, title — 20/26 или 16/22, основной текст — 14/20 или 16/23,
-подписи — 12/18; подписи NavigationBar — 10/14. Размеры заданы в LifetyTheme.
-Сохраняйте системное масштабирование текста. Важные действия имеют текст или
-contentDescription; цвет не является единственным признаком completion/error.
+Типографика — стандартная `Typography()` Material 3, системный шрифт.
+Top app bar использует titleLarge 22 sp; нижние подписи — labelMedium 12 sp.
+Заголовок раздела показывается в одном месте: общей TopAppBar. Внутри экранов —
+локальные заголовки групп, без второго hero и длинного вступления перед формой.
+Масштабирование шрифта сохраняется; не уменьшать текст под фиксированный контейнер.
 
 Не добавляйте сильный glow к каждому контейнеру. Мягкое свечение — характерная
 деталь маскота, остальные поверхности спокойные. Primary Button — неоновый фон,
@@ -57,6 +62,13 @@ contentDescription; цвет не является единственным пр
   DatePicker. TaskEditorRoute, PlannerNavigation и repository signatures сохранены.
 - `core/ui/LifetyDateField.kt`: `LifetyDateField(label, value, onChange, modifier,
   enabled)`, value — ISO civil date, без смены текущей финансовой модели.
+- Finance: диапазон дат и настройка notifications раскрываются по действию;
+  неподтверждённые расходы остаются видимыми независимо от раскрытия настроек.
+  Строка расхода открывает редактор; действия — в стандартном overflow menu.
+- Assistant: ключ/endpoint/модель в раскрывающемся блоке; разрешения и preview
+  видимы отдельно. API-ключ не попадает в rememberSaveable. Точный JSON сохраняется
+  в предпросмотре перед отправкой; автоматических запросов нет.
+- Health: компактные показатели и обычная форма; IME Next/Done и Snackbar после записи.
 - Настройки открываются шестерёнкой в верхней панели. Пока содержат только
   информацию о теме/локальных данных и переход к существующему управлению
   банковскими уведомлениями. Нет фиктивных профилей и неработающих toggles.
@@ -96,15 +108,31 @@ fun LifetyMascot(
 4. Не копируйте drawing/animation в feature. Импортируйте LifetyMascot.
 5. Не делайте маскота препятствием для формы или долгой анимацией перед действием.
 
+## Движение и скорость
+
+Единые spec — `core/ui/LifetyMotion.kt`: Quick 120 ms, Standard 180 ms,
+Emphasis 240 ms. Не увеличивайте задержки бизнес-действий ради анимации.
+
+- Root sections и вкладки Плана: fade 120/180 ms, без длинного бокового проезда.
+- Строки списков: stable keys/contentType и animateItem для вставки/удаления/перестановки.
+- Раскрытие дополнительных настроек: fade + expand/shrink от верхнего края, до 180 ms.
+- Заполнение progress bars: 240 ms, только визуальная доля; денежные значения остаются Long.
+- Формы: стандартные M3 sheet transitions. Сначала успешная запись, затем закрытие;
+  редактор не исчезает до завершения exit animation и не разрешает повторную запись.
+- Системный Animator duration scale учитывается Compose. Нет искусственных задержек,
+  spring-анимаций каждого контейнера, постоянного glow всего интерфейса и обязательных intro.
+- LifetyMascot читает анимацию в graphicsLayer: движение не пересобирает Compose-дерево
+  и не перерисовывает Canvas на каждом кадре. Статичная версия остаётся в header.
+- Счётчики/сводки мемоизированы по данным, SQLite операции — на IO. Списки lazy.
+- У финансового редактора и ручного Health сохраняются поля при configuration change.
+  Ключ AI всегда только в process memory, не в saved state.
+
 ## Область текущего обновления
 
-Применены общий theme, NavigationBar, Planner tabs, настройки входа, Tasks/Calendar,
-Finance UI, editor sheets и общие placeholders. Бизнес-код Finance (суммы,
-репозитории, источники, подтверждение уведомления), общие модели, схема и DI
-сохранены. Существующие данные остаются на месте.
+Обновлены общая тема, навигация/Plan tabs, настройки, Tasks/Calendar,
+Dashboard, Finance/Notifications UI, manual Health и Assistant UI. Repository/API
+контракты, SQL-схема и AI transport/permissions не менялись; данные сохраняются.
+В Dashboard карточки ведут в разделы, строки задач — в существующий planner editor.
 
-Dashboard, опциональный AI и ручной Health подключены из опубликованной
-ветки агента 3 (`e30a688`). Они наследуют готовые tokens/components и прежние
-screen/repository/navigation interfaces. Дополнительные функции ради картинки не требуются.
-Приоритеты, длительность, повторения, пульс и другие отсутствующие поля из
-концепта не добавлены в модель и не показаны как работающие функции.
+Новых бизнес-функций, серверов, моделей, приоритетов и вымышленных данных ради
+референса не добавлялось. Базовые цвета и маскот Lifety сохранены.

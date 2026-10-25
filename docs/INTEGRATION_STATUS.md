@@ -1,5 +1,9 @@
 # Интеграция опубликованных веток — 25 октября 2026
 
+После этой интеграции пользователь объединил PR #1 в main (`2518b8a`).
+Последующая доработка Android UI описана в [UI_POLISH.md](UI_POLISH.md).
+Ниже сохранён отчёт о первоначальном объединении функций.
+
 Ветка назначения: `feature/core`, worktree `/Users/rugilf/Projects/lifety-core`.
 SSH remote: `git@github.com:RuGilf/HSE-hack-2026.git`.
 Main не изменяется; force push не используется. Объединение и push разрешены

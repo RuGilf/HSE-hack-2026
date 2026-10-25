@@ -1,5 +1,7 @@
 package ru.lifety.core.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,16 +35,19 @@ import kotlin.time.Clock
 @Composable
 fun TaskCard(task: Task, busy: Boolean, onOpen: () -> Unit, onToggle: () -> Unit, onDelete: (() -> Unit)? = null) {
     var menu by remember { mutableStateOf(false) }
+    val titleColor by animateColorAsState(
+        if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+        tween(LifetyMotion.Standard), label = "taskCompletion",
+    )
     Card(onClick = onOpen, enabled = !busy, modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (busy) CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), strokeWidth = 2.dp)
-            else Checkbox(checked = task.isCompleted, onCheckedChange = { onToggle() },
+        Row(Modifier.padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Checkbox(checked = task.isCompleted, enabled = !busy, onCheckedChange = { onToggle() },
                 modifier = Modifier.semantics { contentDescription = "Выполнение задачи ${task.title}" })
-            Column(Modifier.weight(1f).padding(top = 10.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.weight(1f).padding(top = 10.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(task.title, style = MaterialTheme.typography.titleMedium,
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
-                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                    color = titleColor)
                 task.scheduledAt?.let { Text("План · ${formatDateTime(it)}", style = MaterialTheme.typography.bodySmall) }
                 task.deadlineAt?.let {
                     val overdue = !task.isCompleted && it < Clock.System.now().toEpochMilliseconds()
@@ -57,7 +62,7 @@ fun TaskCard(task: Task, busy: Boolean, onOpen: () -> Unit, onToggle: () -> Unit
             if (onDelete != null) {
                 Column {
                     IconButton(onClick = { menu = true }, enabled = !busy,
-                        modifier = Modifier.semantics { contentDescription = "Действия с задачей ${task.title}" }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
+                        modifier = Modifier.semantics { contentDescription = "Действия с задачей ${task.title}" }) { LifetyIcon(LifetySymbol.More) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("Редактировать") }, onClick = { menu = false; onOpen() })
                         DropdownMenuItem(text = { Text("Удалить", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDelete() })

@@ -7,6 +7,8 @@ import androidx.compose.ui.unit.dp
 object LifetyColors {
     val Background = Color(0xFF101512)
     val Surface = Color(0xFF1D2520)
+    val PrimaryContainer = Color(0xFF173C25)
+    val SecondaryContainer = Color(0xFF293C30)
     val SurfaceRaised = Color(0xFF263229)
     val Accent = Color(0xFF35EF70)
     val TextPrimary = Color(0xFFF4F7F3)
@@ -19,9 +21,9 @@ object LifetySpacing {
     val Small = 8.dp
     val Item = 12.dp
     val Content = 16.dp
-    val Screen = 20.dp
+    val Screen = 16.dp
     val Section = 24.dp
-    val ControlHeight = 52.dp
+    val ControlHeight = 48.dp
     val MascotInline = 56.dp
     val MascotHero = 120.dp
 }

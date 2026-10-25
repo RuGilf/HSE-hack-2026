@@ -29,7 +29,7 @@ internal fun ExpenseEditorDialog(
     onSave: suspend (Expense) -> Boolean,
 ) {
     val scope = rememberCoroutineScope()
-    val id = remember { initial?.id ?: "manual:${financeNow()}:${kotlin.random.Random.nextLong()}" }
+    val id = rememberSaveable { initial?.id ?: "manual:${financeNow()}:${kotlin.random.Random.nextLong()}" }
     var merchant by rememberSaveable { mutableStateOf(initial?.merchant ?: "") }
     var amount by rememberSaveable { mutableStateOf(initial?.let { minorAmountInput(it.amountMinor) } ?: "") }
     var currency by rememberSaveable { mutableStateOf(initial?.currency ?: "RUB") }
@@ -37,13 +37,14 @@ internal fun ExpenseEditorDialog(
     var date by rememberSaveable { mutableStateOf(localFinanceDate(initial?.timestamp ?: financeNow()).toString()) }
     var attempted by remember { mutableStateOf(false) }
     var submitting by remember { mutableStateOf(false) }
+    var closing by remember { mutableStateOf(false) }
     val parsedDate = FinanceDate.parse(date)
     val minor = parseMinorAmount(amount)
     val valid = merchant.isNotBlank() && minor != null && parsedDate != null
-    val locked = busy || submitting
+    val locked = busy || submitting || closing
     val currentLocked by rememberUpdatedState(locked)
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden || !currentLocked })
+        confirmValueChange = { it != SheetValue.Hidden || !currentLocked || closing })
     ModalBottomSheet(onDismissRequest = { if (!locked) onDismiss() }, sheetState = sheet,
         containerColor = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding().padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
@@ -55,7 +56,7 @@ internal fun ExpenseEditorDialog(
                     initial == null -> "Новый расход"
                     else -> "Изменить расход"
                 }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss, enabled = !locked, modifier = Modifier.semantics { contentDescription = "Закрыть расход" }) {
+                IconButton(onClick = { scope.launch { closing = true; sheet.hide(); onDismiss() } }, enabled = !locked, modifier = Modifier.semantics { contentDescription = "Закрыть расход" }) {
                     LifetyIcon(LifetySymbol.Close, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -81,13 +82,10 @@ internal fun ExpenseEditorDialog(
                     SuggestionChip(onClick = { category = suggestedCategory }, enabled = !locked,
                         label = { Text("Предложение: ${categoryTitle(suggestedCategory)}") })
                 }
-                // Pairs keep category labels readable within the sheet.
-                (financeCategories.keys + category).distinct().chunked(2).forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { key ->
-                            FilterChip(selected = category == key, enabled = !locked,
-                                onClick = { category = key }, label = { Text(categoryTitle(key)) })
-                        }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (financeCategories.keys + category).distinct().forEach { key ->
+                        FilterChip(selected = category == key, enabled = !locked,
+                            onClick = { category = key }, label = { Text(categoryTitle(key)) })
                     }
                 }
                 LifetyDateField("Дата расхода", date, { date = it }, enabled = !locked)
@@ -96,7 +94,7 @@ internal fun ExpenseEditorDialog(
                 if (initial?.source == "demo-notification") Text("Тестовая запись будет сохранена с меткой ДЕМО.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Button(enabled = !locked, modifier = Modifier.fillMaxWidth().height(52.dp), onClick = {
+            Button(enabled = !locked, modifier = Modifier.fillMaxWidth().height(48.dp), onClick = {
                 attempted = true
                 if (valid) {
                     submitting = true
@@ -104,8 +102,12 @@ internal fun ExpenseEditorDialog(
                         try {
                             val timestamp = if (initial != null && localFinanceDate(initial.timestamp) == parsedDate)
                                 initial.timestamp else financeDayStart(requireNotNull(parsedDate))
-                            onSave(Expense(id, requireNotNull(minor), currency, merchant.trim(), category,
-                                timestamp, initial?.source ?: "manual"))
+                            if (onSave(Expense(id, requireNotNull(minor), currency, merchant.trim(), category,
+                                    timestamp, initial?.source ?: "manual"))) {
+                                closing = true
+                                sheet.hide()
+                                onDismiss()
+                            }
                         } finally { submitting = false }
                     }
                 }

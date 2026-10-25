@@ -1,5 +1,9 @@
 package ru.lifety.feature.finance
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import ru.lifety.core.ui.LifetyMotion
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -17,7 +21,8 @@ internal fun MonthlyBudgetCard(month: String, currency: String, spent: Long?, bu
                 else -> {
                     val remaining = remainingBudget(budget, spent)
                     Text("${formatMoney(spent, currency)} из ${formatMoney(budget, currency)}")
-                    LinearProgressIndicator(progress = { expenseShare(spent, budget) }, modifier = Modifier.fillMaxWidth(),
+                    val ratio by animateFloatAsState(expenseShare(spent, budget), tween(LifetyMotion.Emphasis), label = "budgetProgress")
+                    LinearProgressIndicator(progress = { ratio }, modifier = Modifier.fillMaxWidth(),
                         color = if (remaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.outlineVariant)
                     Text((if (remaining < 0) "Превышение: " else "Остаток: ") +
@@ -42,7 +47,8 @@ internal fun CategoryChart(summary: ExpenseSummary, currency: String) {
                         Text(categoryTitle(category), Modifier.weight(1f))
                         Text(formatMoney(amount, currency))
                     }
-                    LinearProgressIndicator(progress = { expenseShare(amount, summary.totalMinor) },
+                    val ratio by animateFloatAsState(expenseShare(amount, summary.totalMinor), tween(LifetyMotion.Emphasis), label = "categoryProgress")
+                    LinearProgressIndicator(progress = { ratio },
                         modifier = Modifier.fillMaxWidth().height(8.dp), trackColor = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
