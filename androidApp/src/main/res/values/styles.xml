@@ -1,6 +1,7 @@
 <resources>
-    <style name="Theme.Lifety" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:colorAccent">#416B57</item>
+    <style name="Theme.Lifety" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorAccent">#35EF70</item>
+        <item name="android:windowBackground">#101512</item>
     </style>
 </resources>

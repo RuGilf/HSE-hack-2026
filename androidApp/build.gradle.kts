@@ -15,6 +15,7 @@ android {
     }
     buildFeatures { compose = true }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -24,6 +25,7 @@ android {
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
 dependencies {
+    coreLibraryDesugaring(libs.android.desugar.jdk)
     implementation(project(":shared"))
     implementation(libs.androidx.activity.compose)
 }

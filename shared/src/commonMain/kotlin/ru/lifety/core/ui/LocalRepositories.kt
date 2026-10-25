@@ -3,5 +3,5 @@ package ru.lifety.core.ui
 import androidx.compose.runtime.staticCompositionLocalOf
 import ru.lifety.core.repository.Repositories
 
-/** Null only while running the foundation placeholders without implementations. */
+/** Production entry points provide the shared SQLite repositories; null permits isolated previews. */
 val LocalRepositories = staticCompositionLocalOf<Repositories?> { null }
