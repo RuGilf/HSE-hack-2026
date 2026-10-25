@@ -4,12 +4,20 @@ kotlin = "2.4.20"
 compose = "1.12.1"
 material3 = "1.9.0"
 activity = "1.13.0"
+navigation = "2.9.2"
+lifecycle = "2.9.2"
+datetime = "0.7.1"
+desugar = "2.1.5"
 coroutines = "1.11.0"
 serialization = "1.11.0"
 ktor = "3.6.0"
 sqldelight = "2.4.0"
 
 [libraries]
+android-desugar-jdk = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }
+navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation" }
+lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose" }
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose" }

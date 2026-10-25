@@ -1,179 +1,156 @@
-# Lifety — фундамент KMP
+# Lifety — Core & Planner P0
 
-Android-first Kotlin Multiplatform + Compose Multiplatform для 7-часового
-хакатона. Есть шесть экранов-заглушек и переключение разделов: обзор, задачи,
-календарь, финансы, ассистент, здоровье. Бизнес-функции пока не реализованы.
+Kotlin Multiplatform + Compose Multiplatform, Android-first. Реализованы локальные
+SQLDelight-репозитории, задачи, календарь, общий DI и Compose Navigation.
+Finance, Dashboard, Assistant и Health — точки входа других агентов, их UI-код
+этой задачей не изменён.
+
+Рабочая ветка: **feature/core**, worktree: `/Users/rugilf/Projects/lifety-core`.
+Основной checkout `/Users/rugilf/Projects/HSE-hack-2026` остаётся на main;
+самостоятельное слияние в main не выполнялось.
 
 ## Запуск Android
 
-Потребуются JDK 21, Android SDK Platform 37 (пакет `platforms;android-37.0`),
-Build Tools 36.0.0, принятые лицензии SDK и доступ к Google Maven, Maven Central
-и Gradle distributions при первой сборке. Android minSdk — 24. Wrapper уже в Git;
-системный Gradle не требуется. Android Studio должна поддерживать AGP 9.3.
-
-На этом ноутбуке:
+Нужны JDK 21, Android SDK Platform 37 (`platforms;android-37.0`), Build Tools
+36.0.0, принятые лицензии SDK и доступ к Google Maven/Maven Central при первой
+сборке. Wrapper Gradle 9.5.1 включён в Git. Android minSdk — **24**, target/compile
+SDK — **37**. Для java.time на API 24–25 включён core library desugaring.
 
 ```sh
-cd /Users/rugilf/Projects/HSE-hack-2026
+cd /Users/rugilf/Projects/lifety-core
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 ./gradlew :androidApp:assembleDebug
 ```
 
-На другой машине задайте `JAVA_HOME` на установленный JDK 21, а `ANDROID_HOME`
-на свой Android SDK. Вместо `ANDROID_HOME` можно создать `local.properties`:
+На другой машине используйте свои пути к JDK 21 и Android SDK. Вместо
+`ANDROID_HOME` можно задать `sdk.dir=/absolute/path/to/sdk` в игнорируемом
+`local.properties`. Gradle JDK в Android Studio тоже выставьте на JDK 21.
 
-```properties
-sdk.dir=/absolute/path/to/Android/sdk
-```
+Откройте **этот worktree** в Android Studio с поддержкой AGP 9.3, выберите
+конфигурацию `androidApp` и устройство API 24+. Для установки из терминала:
+`./gradlew :androidApp:installDebug` (требует подключённого устройства).
 
-`local.properties` игнорируется Git. Не переносите абсолютные пути чужого ноутбука
-в коммиты. Gradle JDK в настройках Android Studio также выставьте на JDK 21:
-системный `java` на этом ноутбуке — JDK 25, который не использовался для проверки.
+APK относительно корня worktree:
+`androidApp/build/outputs/apk/debug/androidApp-debug.apk`.
 
-Откройте корень проекта в Android Studio, дождитесь Gradle sync, выберите
-конфигурацию **androidApp** и устройство/эмулятор с Android API 24+.
-APK: `androidApp/build/outputs/apk/debug/androidApp-debug.apk`.
-Для установки на подключённое устройство можно выполнить
-`./gradlew :androidApp:installDebug`; эта команда требует доступного устройства.
+## Что работает
 
-## Фактическая структура
+- Создание, редактирование, удаление и выполнение задач. Фильтры актуальных,
+  завершённых и всех задач; состояния загрузки, пустого списка и ошибки.
+- Необязательные план и дедлайн с выбором даты и 24-часового времени. Даты
+  сохраняются в UTC epoch milliseconds, показываются в часовом поясе устройства.
+- Месячный календарь с понедельника, переключение месяцев, выбор дня, индикаторы
+  задач и переход в общий редактор. Учитывает и план, и дедлайн; совпадающие даты
+  не дублируют задачу. Создание из календаря предлагает выбранный день в 09:00.
+- Material 3 с карточками, подтверждением удаления, FAB, светлой/тёмной темой.
+- `TaskRepository`, `ExpenseRepository`, `HealthRepository` сохраняют данные
+  в `lifety.db`; SQLDelight Flow уведомляет подписчиков после записи.
+- Android Application владеет одним контейнером БД, общим для всех экранов и
+  Activity. iOS entry point также подключает persistent-контейнер. Диск работает
+  на IO, а не на UI-потоке. При ошибке нет скрытой подмены на in-memory storage.
+- NavHost сохраняет верхние routes, back stack и экранные состояния;
+  редактор получает id задачи через typed route, Back возвращает к источнику.
+
+Модели и публичные repository interfaces не изменены. Формат SQLite-таблиц и
+schema version 1 сохранены: на этом этапе добавлены запросы, миграция не нужна.
+Нет сервера, регистрации, облачной БД, Firebase, AI-реализации и внешних календарей.
+P1 (уведомления, повторы, приоритеты, длительность) не реализован.
+
+## Структура кода
+
+Два Gradle-модуля: `:androidApp` и `:shared`. Основные файлы:
 
 ```text
-HSE-hack-2026/
-├── .gitattributes
-├── .gitignore
-├── AGENTS.md
-├── README.md
-├── docs/CONTRACTS.md
-├── settings.gradle.kts
-├── build.gradle.kts
-├── gradle.properties
-├── gradlew / gradlew.bat
-├── gradle/
-│   ├── libs.versions.toml
-│   └── wrapper/gradle-wrapper.{jar,properties}
-├── androidApp/
-│   ├── build.gradle.kts
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── kotlin/ru/lifety/android/MainActivity.kt
-│       └── res/values/{strings,styles}.xml
-└── shared/
-    ├── build.gradle.kts
-    └── src/
-        ├── commonMain/
-        │   ├── kotlin/ru/lifety/
-        │   │   ├── app/LifetyApp.kt
-        │   │   ├── app/navigation/{AppDestination,RootNavigator}.kt
-        │   │   ├── core/model/{Task,Expense,HealthSnapshot}.kt
-        │   │   ├── core/repository/{TaskRepository,ExpenseRepository,HealthRepository,Repositories}.kt
-        │   │   ├── core/ui/{LocalRepositories,PlaceholderScreen}.kt
-        │   │   ├── core/network/HttpClientFactory.kt
-        │   │   ├── database/DatabaseDriverFactory.kt
-        │   │   └── feature/
-        │   │       ├── tasks/TasksScreen.kt
-        │   │       ├── calendar/CalendarScreen.kt
-        │   │       ├── finance/FinanceScreen.kt
-        │   │       ├── assistant/AssistantScreen.kt
-        │   │       ├── assistant/ai/README.md
-        │   │       ├── dashboard/DashboardScreen.kt
-        │   │       └── health/HealthScreen.kt
-        │   └── sqldelight/ru/lifety/database/Lifety.sq
-        ├── androidMain/kotlin/ru/lifety/
-        │   ├── core/network/HttpClientFactory.android.kt
-        │   ├── database/DatabaseDriverFactory.android.kt
-        │   └── platform/notifications/README.md
-        ├── iosMain/kotlin/ru/lifety/
-        │   ├── app/MainViewController.kt
-        │   ├── core/network/HttpClientFactory.ios.kt
-        │   └── database/DatabaseDriverFactory.ios.kt
-        ├── commonTest/kotlin/ru/lifety/
-        │   ├── core/model/SerializationContractTest.kt
-        │   └── app/navigation/NavigationContractTest.kt
-        └── androidHostTest/kotlin/ru/lifety/database/DatabaseSchemaTest.kt
+androidApp/src/main/
+  AndroidManifest.xml                         LifetyApplication registration
+  kotlin/ru/lifety/android/
+    LifetyApplication.kt                      Process-wide DB container
+    MainActivity.kt                           Bootstrap + root Compose
+shared/src/commonMain/kotlin/ru/lifety/
+  app/
+    LifetyApp.kt                              NavHost, six feature entries
+    RepositoryBootstrap.kt                    Loading/error/retry
+    navigation/{AppDestination,RootNavigator,TaskEditorRoute}.kt
+  core/
+    di/AppContainer.kt                        Driver + all repositories
+    model/{Task,Expense,HealthSnapshot}.kt      Unchanged
+    repository/*.kt                           Unchanged public interfaces
+    navigation/PlannerNavigation.kt           Editor integration point
+    planner/TaskListViewModel.kt               Shared StateFlow state
+    time/PlannerDates.kt                      KMP date/time and day selection
+    ui/{LocalRepositories,LifetyTheme,TaskCard,PlaceholderScreen}.kt
+  database/
+    DatabaseDriverFactory.kt                  SQLDelight Int adapters
+    SqlDelightRepositories.kt                 Three persistent repositories
+  feature/
+    tasks/{TasksScreen,TaskEditorScreen,TaskEditorViewModel}.kt
+    calendar/CalendarScreen.kt
+    finance/, dashboard/, assistant/, health/  Other agents' entries
+shared/src/commonMain/sqldelight/ru/lifety/database/Lifety.sq
+shared/src/androidMain/                        SQLite/HTTP platform drivers
+shared/src/iosMain/                            Drivers + MainViewController
+shared/src/commonTest/                         Model, navigation, date tests
+shared/src/androidHostTest/                    SQLite schema/persistence tests
 ```
 
-`:androidApp` — Android application с Kotlin support от AGP 9. `:shared` — KMP
-library с новым `com.android.kotlin.multiplatform.library` plugin и targets
-`android`, `iosArm64`, `iosSimulatorArm64`. Общие модели/интерфейсы/UI не зависят
-от Android SDK. Полного Xcode host-приложения пока нет.
+## Интеграция других агентов
 
-## Контракты и параллельная работа
+Полные стабильные сигнатуры, пакеты, пути и правила — в
+[docs/CONTRACTS.md](docs/CONTRACTS.md). Владение файлами — в [AGENTS.md](AGENTS.md).
 
-Точные модели, suspend-методы репозиториев, единицы измерения, семантика будущего
-хранилища, пакеты, пути файлов, DI и точки навигации зафиксированы в
-[docs/CONTRACTS.md](docs/CONTRACTS.md). Инструкции для агентов — также в
-[AGENTS.md](AGENTS.md).
+Все существующие `@Composable fun XxxScreen(modifier: Modifier = Modifier)`
+зарегистрированы в NavHost. Другим агентам достаточно заменить тело своего
+экрана; правки root-файла не нужны. Репозитории доступны через
+`ru.lifety.core.ui.LocalRepositories.current` (`tasks`, `expenses`, `health`).
+Production entry points передают реальный набор; `null` оставлен для preview.
 
-| Агент | Владеет |
-| --- | --- |
-| Codex 1 | core, database, tasks, calendar, root navigation, Gradle, Manifest, Android launcher, общая документация |
-| Codex 2 | finance, Android notifications |
-| Codex 3 | assistant, dashboard, health, AI integrations |
+Открытие редактора из любого feature без импорта tasks:
+`LocalPlannerNavigation.current?.openTask(task.id)` или `.createTask()` из
+`ru.lifety.core.navigation`. Верхние переходы доступны через
+`LocalRootNavigator.current?.navigate(AppDestination.CALENDAR)` из
+`ru.lifety.app.navigation`.
 
-Все начинают от одного commit фундамента в разных branches/worktrees.
-Codex 2/3 сохраняют публичные `XxxScreen(modifier: Modifier = Modifier)` и работают
-через общие repository interfaces. Изменения зависимостей, схемы, моделей,
-Manifest и routes координирует Codex 1. Каждый коммитит свою область; Codex 1
-последовательно интегрирует изменения и проверяет общую сборку.
-
-## Что подключено
-
-- SQLDelight: одна общая схема `LifetyDatabase` с таблицами task/expense/healthSnapshot,
-  Android и Native драйверы. Файл БД — `lifety.db`. CRUD и реализации репозиториев
-  остаются следующему этапу Codex 1; стартовая заглушка не открывает БД.
-- Coroutines + StateFlow: интерфейсы возвращают Flow, навигация публикует StateFlow.
-- kotlinx.serialization: все общие модели `@Serializable`, точные JSON-поля.
-- Ktor Client: общая фабрика с JSON/таймаутами, OkHttp/Darwin engines.
-  Клиент не создаётся и запросы не отправляются при запуске заглушек.
-- Repository DI: `Repositories` передаётся в `LifetyApp`, доступен через
-  `LocalRepositories`; baseline работает с `null` до реализации контейнера.
-
-Сервера, облачной БД, регистрации, векторного поиска, AI provider/API-ключа,
-уведомлений и источника health-данных нет.
+Codex 2 владеет Finance/Notifications; Codex 3 — Dashboard/Assistant/Health/AI.
+Новые зависимости и изменения Manifest/схемы/routes согласуются с Codex 1.
+От них не требуется ничего для работоспособности текущего Planner P0.
+Для notifications нужны конкретные Android-классы и запрос на их DI/Manifest
+интеграцию — в этом коммите уведомления не создаются.
 
 ## Проверки
 
-Проверено 25 октября 2026 на macOS arm64, JDK **21.0.12.1**, Gradle **9.5.1**,
-Android SDK **37**, Build Tools **36.0.0**. Для iOS compile использован Xcode **27.1**.
-Все команды ниже выполнены из корня репозитория с `JAVA_HOME`, указанным выше:
+Проверено **25 октября 2026**, macOS arm64, JDK **21.0.12.1**, Gradle **9.5.1**,
+Android SDK **37**, Build Tools **36.0.0**, Xcode **27.1**.
+Команды выполнены с указанными выше `JAVA_HOME` и `ANDROID_HOME`:
 
 ```sh
 ./gradlew :androidApp:assembleDebug :shared:testAndroidHostTest
 ./gradlew :androidApp:build :shared:testAndroidHostTest
-./gradlew :shared:compileKotlinIosSimulatorArm64
+./gradlew :shared:compileKotlinIosSimulatorArm64 :androidApp:build :shared:testAndroidHostTest
 ```
 
-Результаты:
+- Android debug/release assembly и lint — **BUILD SUCCESSFUL**.
+- **13 host tests: 0 failures, 0 errors, 0 skipped**. Это 5 прежних проверок,
+  4 новых проверки репозиториев и 4 проверки дат/календаря.
+- Проверены реактивные insert/update/delete, полная замена nullable полей,
+  стабильная сортировка, latest health по максимальному timestamp,
+  точность денег >2⁵³, закрытие/повторное открытие файловой SQLite для всех
+  трёх репозиториев и сохранение удаления при следующем открытии.
+- Проверены локальная дата относительно UTC, civil date DatePicker,
+  отсутствие дублей в календаре, leap day, DST gap detection.
+- Общий код, платформенный DI и UI скомпилированы для **iOS Simulator arm64**.
 
-- Android debug APK: **BUILD SUCCESSFUL**.
-- Полный `:androidApp:build`: **BUILD SUCCESSFUL**, включая debug/release assembly
-  и lint. Release APK — unsigned, публикационная подпись не настроена.
-- Shared host tests: **5 tests, 0 failures, 0 errors, 0 skipped** — JSON nullable
-  полей и Unicode, точность денег больше 2⁵³, неизвестные health-значения,
-  восстановление route, создание SQLite-схемы и точность 64-bit SQLite INTEGER.
-- iOS Simulator arm64: **compileKotlinIosSimulatorArm64 — BUILD SUCCESSFUL**;
-  проверены commonMain + iosMain и совместимость Compose-зависимостей.
+Остаются предупреждения beta expect/actual classes и рекомендации lint по
+обновлению фиксированных зависимостей, launcher icon и data extraction rules.
+Release APK unsigned; публикационная подпись не настраивалась.
 
-В сборке остаются предупреждения Kotlin о beta-статусе expect/actual classes,
-упаковке `libandroidx.graphics.path.so` без stripping и lint-рекомендации
-обновить зависимости, добавить launcher icon и data extraction rules. Ошибок
-компиляции, тестов и lint нет. Версии намеренно зафиксированы как проверенная
-совместимая связка; обновления не являются частью фундамента.
+Не проверено: запуск/визуальное взаимодействие на устройстве, Android process
+restart на настоящем driver, iOS framework linking/runtime/physical device.
+`adb devices` не нашёл устройств, `emulator -list-avds` не нашёл настроенных AVD.
+Файловая персистентность проверена реальной SQLite JDBC с повторным открытием,
+а не имитацией в памяти. Несохранённый черновик редактора переживает rotation
+через ViewModel, но не гарантируется после завершения процесса.
 
-Не проверено:
-
-- Установка APK, запуск и визуальное взаимодействие с экранами на Android:
-  `adb devices` не обнаружил подключённых устройств, эмулятор не запускался.
-- Полное iOS host-приложение, линковка framework, iOS runtime, iOS device arm64:
-  Xcode host-проект пока не создавался; проверена только simulator-компиляция KMP.
-- Публикационная подпись release, публикация в магазины.
-- Android/Native SQLite driver на устройстве: схема проверена через реальный
-  SQLite JDBC в host-тесте. Само приложение пока не открывает БД.
-- Реальные HTTP/AI вызовы, health-источники и notifications: эта функциональность
-  намеренно отсутствует на этапе фундамента.
-
-Версии фиксированы в version catalog. Обоснование совместимости и официальные
-источники приведены в конце `docs/CONTRACTS.md`. Не обновляйте стек независимо
-в ветках функций во время хакатона.
+Для ручного smoke test на устройстве: создать задачу с планом и дедлайном,
+изменить её из календаря, отметить выполнение, проверить фильтры, перезапустить
+приложение и проверить данные, удалить задачу и повторить запуск.

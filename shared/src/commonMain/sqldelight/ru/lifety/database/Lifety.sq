@@ -1,7 +1,7 @@
 import kotlin.Boolean;
 import kotlin.Int;
 
--- Schema only. Repository queries and implementations belong to Codex 1.
+-- Schema version 1: query additions do not change the on-disk schema.
 CREATE TABLE task (
     id TEXT NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,
@@ -25,3 +25,30 @@ CREATE TABLE healthSnapshot (
     sleepMinutes INTEGER AS Int,
     steps INTEGER AS Int
 );
+
+selectTasks:
+SELECT * FROM task ORDER BY id ASC;
+
+upsertTask:
+INSERT OR REPLACE INTO task(id, title, scheduledAt, deadlineAt, isCompleted)
+VALUES (?, ?, ?, ?, ?);
+
+deleteTask:
+DELETE FROM task WHERE id = ?;
+
+selectExpenses:
+SELECT * FROM expense ORDER BY timestamp DESC, id ASC;
+
+upsertExpense:
+INSERT OR REPLACE INTO expense(id, amountMinor, currency, merchant, category, timestamp, source)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+deleteExpense:
+DELETE FROM expense WHERE id = ?;
+
+selectLatestHealth:
+SELECT * FROM healthSnapshot ORDER BY timestamp DESC LIMIT 1;
+
+upsertHealth:
+INSERT OR REPLACE INTO healthSnapshot(timestamp, sleepMinutes, steps)
+VALUES (?, ?, ?);

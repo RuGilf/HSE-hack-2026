@@ -1,9 +1,13 @@
-# Lifety — контракты фундамента v1
+# Lifety — контракты интеграции v1 (Core & Planner P0)
 
 ## Статус и структура
 
-Общий компилируемый фундамент для 7-часового хакатона. Бизнес-функции не
-реализованы. Фактический репозиторий: `/Users/rugilf/Projects/HSE-hack-2026`.
+Core & Planner P0 реализован в ветке `feature/core`, worktree
+`/Users/rugilf/Projects/lifety-core`. Основной репозиторий:
+`/Users/rugilf/Projects/HSE-hack-2026`; слияние в main не выполняется этой задачей.
+Реализованы SQLite-репозитории всех трёх доменов, задачи, календарь, DI и навигация.
+Finance, Dashboard, Assistant и Health остаются точками интеграции других агентов;
+их функциональные исходники в этой ветке не изменены.
 Два Gradle-модуля: `:androidApp` (запуск Android) и `:shared` (KMP, включая Compose).
 Границы функций — каталоги и Kotlin-пакеты внутри `:shared`, не отдельные
 Gradle-модули. Это сокращает настройку и число общих файлов при параллельной работе.
@@ -113,7 +117,7 @@ data class Repositories(
 )
 ```
 
-Требования к **будущим** реализациям Codex 1:
+Гарантии SQLDelight-реализаций Codex 1:
 
 - Наблюдение выдаёт текущее состояние при подписке и изменения после успешной
   записи. Для пустой БД — `emptyList()` и `null`, без фиктивных данных.
@@ -129,8 +133,13 @@ data class Repositories(
 - Репозитории создаются один раз в composition root, общие для всех функций.
   UI-state функций публикуется как `StateFlow`, изменяемый flow остаётся приватным.
 
-Реализаций в baseline нет. Согласованные интерфейсы можно использовать с
-feature-local test fake; не добавлять production in-memory «БД» вместо SQLite.
+Реализации: `ru.lifety.database.SqlDelightTaskRepository`,
+`SqlDelightExpenseRepository`, `SqlDelightHealthRepository` в
+`C/database/SqlDelightRepositories.kt`. Запросы выполняются на переданном
+`CoroutineDispatcher` (по умолчанию `Dispatchers.IO`); SQLDelight `asFlow()` с
+`mapToList`/`mapToOneOrNull` передаёт изменения всем подписчикам. Одна SQL-команда
+`INSERT OR REPLACE` атомарно полностью заменяет строку. Feature-local test fake
+допустим только в тестах; production использует одну SQLite БД.
 
 ## SQLite и DI
 
@@ -140,8 +149,13 @@ NativeSqliteDriver на iOS. `JdbcSqliteDriver` используется тол�
 `ru.lifety.database.generated.LifetyDatabase`.
 Схема содержит таблицы `task`, `expense`, `healthSnapshot` с полями моделей;
 `Boolean` и nullable `Int` имеют SQLDelight type projections.
-Запросов CRUD и repository implementations пока нет. Сгенерированный код в `build/`
-не редактировать и не коммитить; новые `.sq`/миграции согласует Codex 1.
+CRUD-запросы находятся в существующем `Lifety.sq`: `selectTasks`, `upsertTask`,
+`deleteTask`, `selectExpenses`, `upsertExpense`, `deleteExpense`,
+`selectLatestHealth`, `upsertHealth`. Формат таблиц и schema version 1 не изменены,
+миграция для этого этапа не требуется. Int-адаптеры подключаются в
+`createDatabase`, проверяют диапазон Int при чтении SQLite INTEGER.
+Сгенерированный код в `build/` не редактировать и не коммитить; дальнейшие
+изменения схемы и миграции согласует Codex 1.
 
 Стабильные фабрики:
 
@@ -155,14 +169,30 @@ fun createDatabase(driver: SqlDriver): LifetyDatabase
 // iosMain constructor: DatabaseDriverFactory()
 ```
 
-Контейнер Codex 1 удерживает `SqlDriver`, создаёт `Repositories` и передаёт его в
-`LifetyApp(repositories)`. Драйвер закрывается вместе с контейнером, не экраном.
-UI получает репозитории через `ru.lifety.core.ui.LocalRepositories.current`.
-В baseline `LifetyApp(repositories: Repositories? = null)` предоставляет `null`:
-заглушки безопасно запускаются без хранилища, fake-данных и вызовов репозиториев.
-До интеграции реального контейнера новые экраны должны при `null` показывать
-заглушку/состояние «хранилище не подключено», а не падать или подменять данные.
-После интеграции Codex 1 передаёт один реальный контейнер всем функциям.
+`ru.lifety.core.di.AppContainer(driver: SqlDriver, dispatcher: CoroutineDispatcher = Dispatchers.IO)`
+в `C/core/di/AppContainer.kt` удерживает driver и один `Repositories` для приложения;
+`close()` закрывает соединение. Репозитории не закрываются при переходах между экранами.
+
+Android: `ru.lifety.android.LifetyApplication` в
+`androidApp/src/main/kotlin/ru/lifety/android/LifetyApplication.kt` владеет
+контейнером на время процесса. `container(): Deferred<AppContainer>` создаёт его
+в application coroutine scope на IO, сохраняет один успешный результат и
+позволяет повторить инициализацию после ошибки. MainActivity ожидает контейнер
+через `RepositoryBootstrap`, передаёт `repositories` в `LifetyApp`. Смена Activity
+не создаёт новую БД. `android:name=".LifetyApplication"` установлен в Manifest.
+На iOS `MainViewController` использует один lazy-контейнер на время процесса,
+также создаваемый вне UI-потока. ОС освобождает ресурсы при завершении процесса;
+тесты и явно созданные контейнеры вызывают `close()` самостоятельно.
+
+`RepositoryBootstrap` показывает загрузку/ошибку и повторную попытку без подмены
+БД in-memory данными. UI всех функций получает тот же набор через
+`ru.lifety.core.ui.LocalRepositories.current` с полями `.tasks`, `.expenses`, `.health`.
+`LifetyApp(repositories: Repositories? = null)` сохраняет прежнюю сигнатуру:
+`null` допустим для изолированного preview/test host; production Android/iOS
+entry points передают реальные репозитории. Tasks и Calendar при `null` показывают
+явное состояние «хранилище не подключено». Другим экранам следует делать так же.
+Notification service не является Compose-экраном: его отдельный DI-адаптер и
+Manifest-компоненты согласуются с Codex 1 после предоставления классов Codex 2.
 
 ## Навигационные интеграционные точки
 
@@ -184,15 +214,51 @@ iOS entry: `ru.lifety.app.MainViewController()` в `I/app/MainViewController.kt`
 | `assistant` / `ASSISTANT` | `ru.lifety.feature.assistant` | `C/feature/assistant/AssistantScreen.kt`: `AssistantScreen` |
 | `health` / `HEALTH` | `ru.lifety.feature.health` | `C/feature/health/HealthScreen.kt`: `HealthScreen` |
 
-`RootNavigator.destination: StateFlow<AppDestination>` — read-only состояние;
-`navigate(destination: AppDestination): Unit` переключает верхний раздел.
-Начальный раздел — dashboard. `LifetyApp` сохраняет route через `rememberSaveable`;
-`AppDestination.fromRoute(String)` восстанавливает его, неизвестный route даёт dashboard.
-Это выбор верхнего раздела без стека вложенных экранов. Межфункциональные переходы
-и новые routes добавляет Codex 1; агент функции передаёт ему запрос на callback.
-Внутреннюю навигацию функция держит внутри своего каталога.
+Корень использует Compose Navigation: `rememberNavController()` + `NavHost`.
+Шесть прежних строковых routes сохранены. Начальный раздел — dashboard;
+верхние разделы сохраняют состояние при переключении, повторный выбор не создаёт
+дубликат destination. Android Back и iOS Back обрабатывает Navigation.
 
-Все шесть экранов уже вызываются в `when` корневого файла. Codex 2/3 заменяют
+`RootNavigator.destination: StateFlow<AppDestination>` и
+`navigate(destination: AppDestination): Unit` сохранены. Это фасад NavHost;
+`LocalRootNavigator.current` в пакете `ru.lifety.app.navigation` позволяет
+перейти к верхнему разделу, например `navigate(AppDestination.CALENDAR)`.
+Конструктор получил необязательный callback `onNavigate`; старый вызов
+`RootNavigator(initialDestination)` остаётся корректным. `AppDestination.fromRoute`
+сохраняет fallback неизвестной строки в dashboard. Восстановлением реального
+back stack и аргументов теперь управляет NavController.
+
+Новый внутренний typed destination:
+
+```kotlin
+// ru.lifety.app.navigation, C/app/navigation/TaskEditorRoute.kt
+@Serializable
+data class TaskEditorRoute(val taskId: String? = null, val scheduledAt: Long? = null)
+```
+
+Он открывает `TaskEditorScreen(taskId, initialScheduledAt, onClose, modifier)`
+в пакете `ru.lifety.feature.tasks`. Отсутствующий `taskId` означает новую задачу;
+`scheduledAt` задаёт начальное время для создания из календаря. Для редактирования
+передаётся только id, актуальная задача читается из репозитория. Opaque id не
+склеивается с URL: аргументы кодирует typed Navigation. Сохранение/удаление/отмена
+возвращают на предыдущий экран. Нижняя навигация скрыта в редакторе.
+
+Стабильная точка открытия planner из любой функции без импорта `feature.tasks`:
+
+```kotlin
+// ru.lifety.core.navigation, C/core/navigation/PlannerNavigation.kt
+interface PlannerNavigation {
+    fun openTask(id: String)
+    fun createTask(scheduledAt: Long? = null)
+}
+// LocalPlannerNavigation.current?.openTask(task.id)
+// LocalPlannerNavigation.current?.createTask()
+```
+
+`LocalPlannerNavigation` предоставлен корнем вместе с репозиториями. Новые
+верхние routes добавляет Codex 1. Feature-local навигация остаётся у функции.
+
+Все шесть экранов уже зарегистрированы в NavHost корневого файла. Codex 2/3 заменяют
 тело своего `XxxScreen`, сохраняя имя, пакет и сигнатуру. `modifier` применяется
 к корневому UI-элементу. Feature-код не импортирует другие feature-пакеты;
 dashboard/assistant работают с общими моделями и репозиториями.
@@ -220,33 +286,63 @@ Android imports в commonMain. Публичный notification API соглас�
    Gradle/Manifest/навигация. Codex 2: finance/notifications. Codex 3:
    assistant/dashboard/health/AI. Вне своей зоны — только согласованный запрос владельцу.
 3. Codex 2/3 могут сразу разрабатывать UI/state с общими интерфейсами и локальными
-   тестовыми fake, пока Codex 1 реализует SQLite-репозитории. Production DI остаётся у Codex 1.
+   тестовыми fake; SQLite-репозитории и production DI уже доступны в `feature/core`.
 4. Новая зависимость, модель, route, миграция, permission или receiver — сначала
    точная сигнатура/патч-запрос Codex 1. Не править общие файлы одновременно.
 5. Каждый коммитит только свою область и проверяет Android-сборку и host-тесты.
-   Codex 1 последовательно интегрирует коммиты 2/3, разрешает конфликты и повторяет проверки.
+   Интеграция веток выполняется отдельным поручением; текущая задача делает только
+   commit в feature/core, без merge в main.
 6. Не обновлять версии стека во время 7-часового хакатона без конкретной причины
    и согласованной проверки сборки. Не создавать сервер, облачную БД, регистрацию,
    векторный поиск или второе SQLite-решение.
 
-Пример подготовки worktree (выполнять **после** commit baseline; эти команды
-документированы, не выполнялись при создании фундамента):
+На этом ноутбуке worktree уже подготовлены:
 
-```sh
-git worktree add -b codex/1-core ../lifety-codex-1 HEAD
-git worktree add -b codex/2-finance ../lifety-codex-2 HEAD
-git worktree add -b codex/3-assistant ../lifety-codex-3 HEAD
-```
+| Ветка | Worktree |
+| --- | --- |
+| `feature/core` | `/Users/rugilf/Projects/lifety-core` |
+| `feature/finance` | `/Users/rugilf/Projects/lifety-finance` |
+| `feature/assistant` | `/Users/rugilf/Projects/lifety-assistant` |
 
-Каждому worktree нужен свой игнорируемый `local.properties` с `sdk.dir` либо
-`ANDROID_HOME`. Не использовать общий working tree трём агентам одновременно.
+Не переключать чужие ветки, не редактировать их working tree и не создавать
+повторные ветки для уже подготовленных агентов. Каждому worktree нужен свой
+игнорируемый `local.properties` с `sdk.dir` либо `ANDROID_HOME`. Финансовая и
+assistant-ветки могут продолжать работу с прежними интерфейсами; при последующем
+объединении core-коммит подключит реальные репозитории к тем же экранным входам.
+
+## Planner P0: поведение и границы
+
+- `TasksScreen` создаёт/редактирует/удаляет задачи, отмечает выполнение;
+  фильтры «Актуальные», «Завершённые», «Все». Список сортируется для UI отдельно
+  от repository order. Пустое название запрещает только редактор; модели и
+  репозитории не получают новых ограничений. Название перед сохранением trim.
+- План и дедлайн — независимые nullable даты с временем. Они могут быть в прошлом;
+  редактирование не меняет id и completion без явного действия пользователя.
+- `TaskEditorViewModel` сохраняет черновик при configuration change. Несохранённый
+  черновик при завершении процесса не гарантируется; сохранённые данные остаются в SQLite.
+- `CalendarScreen` — месячная сетка с понедельника, выбор дня и отметки наличия задач.
+  Показывает задачи по локальной дате `scheduledAt` **или** `deadlineAt`. Если даты
+  совпали, задача отображается один раз. Задачи без обеих дат в календаре не видны.
+  Новая задача выбранного дня получает начальное время 09:00 локально, которое
+  можно изменить в редакторе. Нажатие на задачу открывает тот же редактор.
+- `C/core/time/PlannerDates.kt` содержит KMP-конвертацию локальных дат/времени в
+  epoch milliseconds. DatePicker трактуется как civil date в UTC; timezone
+  применяется только при объединении с локальным временем. Несуществующее время
+  при spring-forward DST отклоняется UI, неоднозначное время при осеннем переходе
+  выбирается по стандартной семантике kotlinx-datetime (раннее смещение).
+- `C/core/planner/TaskListViewModel.kt` — общий StateFlow state задач/календаря;
+  в `C/core/ui/TaskCard.kt` и `LifetyTheme.kt` находятся общий компонент и M3-тема.
+- Нет recurrence, приоритетов, длительности или уведомлений. Контракты моделей
+  не расширены. Notifications — зона Codex 2, AI/health UI — Codex 3.
 
 ## Версии и источники
 
 Версии зафиксированы в `gradle/libs.versions.toml`; wrapper — Gradle 9.5.1.
 Kotlin/Compose compiler 2.4.20, Compose Multiplatform 1.12.1, Material3 1.9.0 (stable), AGP 9.3.1,
 Coroutines 1.11.0, Serialization 1.11.0, Ktor 3.6.0, SQLDelight 2.4.0,
-Activity Compose 1.13.0. JDK для проверки — 21, JVM bytecode — 17.
+Activity Compose 1.13.0. Добавлены Navigation Compose 2.9.2, Lifecycle ViewModel Compose 2.9.2
+и kotlinx-datetime 0.7.1, desugar_jdk_libs 2.1.5 для java.time на Android API 24–25;
+прежние версии не обновлялись. JDK для проверки — 21, JVM bytecode — 17.
 Android minSdk 24, compileSdk/targetSdk 37.
 
 При выборе сверены официальные источники:
@@ -257,5 +353,8 @@ Android minSdk 24, compileSdk/targetSdk 37.
 [SQLDelight releases](https://github.com/sqldelight/sqldelight/releases),
 [Ktor releases](https://github.com/ktorio/ktor/releases),
 [Coroutines releases](https://github.com/Kotlin/kotlinx.coroutines/releases),
-[Serialization releases](https://github.com/Kotlin/kotlinx.serialization/releases).
+[Serialization releases](https://github.com/Kotlin/kotlinx.serialization/releases),
+[Compose Navigation](https://kotlinlang.org/docs/multiplatform/compose-navigation-routing.html),
+[kotlinx-datetime](https://github.com/Kotlin/kotlinx-datetime),
+[Android API desugaring](https://developer.android.com/studio/write/java8-support).
 Фактические результаты сборки и ограничения проверки — в README.

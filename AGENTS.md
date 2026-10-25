@@ -1,8 +1,8 @@
 # Lifety: parallel work contract
 
 Read `docs/CONTRACTS.md` and `README.md` before editing. This baseline contains
-infrastructure and placeholders only. Implement features only when a subsequent
-user task authorizes them.
+Core & Planner P0 (SQLite repositories, tasks, calendar, navigation and DI).
+Keep feature work within the current user-authorized scope.
 
 - Codex 1 owns core, database, tasks, calendar, root navigation, all Gradle files,
   Android entry point, resources and Manifest, documentation and shared tests.
@@ -18,3 +18,10 @@ Use separate branches/worktrees for parallel agents. Do not commit generated
 files, `local.properties`, credentials or build output. Before handing off, run
 the Android build and shared host tests specified in the README. Only claim
 checks that actually ran. Document missing device/iOS checks.
+
+For the Core & Planner delivery, work and commit in `feature/core` at
+`/Users/rugilf/Projects/lifety-core`. Do not merge into main as part of this task.
+Public core models/repository signatures and all existing `XxxScreen(modifier)`
+entry points stay unchanged. Other agents consume `LocalRepositories`,
+`LocalPlannerNavigation` and optionally `LocalRootNavigator`; do not replace the
+composition root or edit another agent's feature implementation.
