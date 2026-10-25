@@ -14,10 +14,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import ru.lifety.core.ui.*
 import ru.lifety.feature.assistant.agent.*
+import com.mikepenz.markdown.m3.Markdown
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,8 +42,9 @@ fun AssistantScreen(modifier: Modifier = Modifier) {
         state.view.document.messages.filter { (it.role == "user" && !it.text.startsWith("APP_RECEIPT:")) || (it.role == "assistant" && it.text.isNotBlank()) }
     }
     val proposals = state.view.document.proposals.filter { it.status != "rejected" }
-    LaunchedEffect(messages.size, proposals.size) {
-        if (messages.isNotEmpty() || proposals.isNotEmpty()) list.animateScrollToItem((messages.size + proposals.size - 1).coerceAtLeast(0))
+    val latestAction = state.view.document.messages.lastOrNull { it.calls.isNotEmpty() }?.calls?.lastOrNull()?.id
+    LaunchedEffect(messages.size, proposals.size, latestAction) {
+        if (messages.isNotEmpty()) list.animateScrollToItem(messages.size + proposals.size)
     }
     fun send() { if (controller.send(input.trim()) != null) { input = ""; focus.clearFocus() } }
     Column(modifier.fillMaxSize().imePadding()) {
@@ -48,7 +52,8 @@ fun AssistantScreen(modifier: Modifier = Modifier) {
             Text(if (state.connected) state.credentials.settings.model else "Подключите свою модель", Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             TextButton(onClick = { saved = true }, enabled = state.connected && !state.busy) { Text("Сохранённое") }
-            IconButton(onClick = { settings = true }, enabled = !state.busy) { LifetyIcon(LifetySymbol.Settings) }
+            IconButton(onClick = { settings = true }, enabled = !state.busy,
+                modifier = Modifier.semantics { contentDescription = "Настройки ассистента" }) { LifetyIcon(LifetySymbol.Settings) }
         }
         if (messages.isEmpty()) {
             Column(Modifier.weight(1f).fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -71,7 +76,7 @@ fun AssistantScreen(modifier: Modifier = Modifier) {
                     if (message.role == "user") Surface(color = MaterialTheme.colorScheme.secondaryContainer,
                         shape = RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp), modifier = Modifier.widthIn(max = 340.dp)) {
                         SelectionContainer { Text(message.text, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyLarge) }
-                    } else SelectionContainer { Text(message.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.fillMaxWidth()) }
+                    } else SelectionContainer { Markdown(message.text, modifier = Modifier.fillMaxWidth()) }
                 }
             }
             items(proposals, key = { it.id }, contentType = { "approval" }) { proposal ->

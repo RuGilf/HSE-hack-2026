@@ -33,6 +33,7 @@ kotlin {
             api(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation("io.github.dokar3:quickjs-kt:1.0.15")
+            implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.46.0")
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)
             implementation(libs.ktor.client.core)

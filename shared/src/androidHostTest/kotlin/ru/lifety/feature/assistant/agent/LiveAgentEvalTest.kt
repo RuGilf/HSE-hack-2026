@@ -7,6 +7,31 @@ import kotlin.test.*
 
 /** Opt-in outcome eval. Credentials exist only in the test process environment. */
 class LiveAgentEvalTest {
+    @Test fun realProviderWorksThroughTheSameConnectAndSendPathAsTheScreen() = runBlocking {
+        val key = System.getenv("LIFETY_LLM_API_KEY")
+        val endpoint = System.getenv("LIFETY_LLM_BASE_URL")
+        val model = System.getenv("LIFETY_LLM_MODEL")
+        org.junit.Assume.assumeTrue("Set LIFETY_LLM_* to enable live eval", !key.isNullOrBlank() && !endpoint.isNullOrBlank() && !model.isNullOrBlank())
+        val root = Files.createTempDirectory("lifety-live-chat-connect").toFile()
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
+        val credentials = AgentCredentials(ProviderSettings(endpoint!!, model!!, 65536), key!!)
+        val runtime = AgentRuntime(AgentWorkspace(LocalAgentDisk(root.resolve("workspace").path)), JsonAgentStore(LocalAgentDisk(root.resolve("private").path)),
+            object : AgentVault {
+                override val description = "live fixture memory only"
+                override suspend fun load() = credentials
+                override suspend fun save(credentials: AgentCredentials) = Unit
+            }, System::currentTimeMillis, kotlinx.coroutines.sync.Mutex())
+        val controller = AgentChatController(runtime, null, scope)
+        try {
+            controller.connect(credentials).join()
+            assertTrue(controller.state.value.connected, controller.state.value.error)
+            controller.send("Это изолированная проверка соединения без личных данных. Не используй инструменты. Ответь только фразой: Соединение работает.")!!.join()
+            assertEquals(RunPhase.IDLE, controller.state.value.view.phase, controller.state.value.view.error)
+            assertTrue(controller.state.value.view.document.messages.last().text.contains("Соединение работает", ignoreCase = true))
+            println("LIVE_CHAT connect=passed send=passed model=$model")
+        } finally { controller.close(); scope.coroutineContext[kotlinx.coroutines.Job]?.cancel(); root.deleteRecursively() }
+    }
+
     @Test fun realModelRemembersAndCorrectsAPreferenceAcrossSessions() = runBlocking {
         val key = System.getenv("LIFETY_LLM_API_KEY")
         val endpoint = System.getenv("LIFETY_LLM_BASE_URL")

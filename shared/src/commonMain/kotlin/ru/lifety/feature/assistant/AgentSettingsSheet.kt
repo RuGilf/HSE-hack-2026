@@ -19,6 +19,8 @@ import ru.lifety.feature.assistant.agent.*
     var key by remember(state.credentials) { mutableStateOf(state.credentials.key) }
     var scopes by remember(state.view.document.scopes) { mutableStateOf(state.view.document.scopes) }
     var confirmScopes by remember { mutableStateOf(false) }
+    val entered = AgentCredentials(state.credentials.settings.copy(baseUrl = base.trim().trimEnd('/').removeSuffix("/chat/completions"), model = model.trim()), key.trim())
+    val configured = state.connected && entered == state.credentials
     ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Подключение", style = MaterialTheme.typography.titleLarge)
@@ -28,8 +30,12 @@ import ru.lifety.feature.assistant.agent.*
             OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth(), label = { Text("API-ключ") }, singleLine = true, enabled = !state.busy,
                 visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
             Text(controller.credentialStorageDescription, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = { controller.connect(AgentCredentials(state.credentials.settings.copy(baseUrl = base.trim().trimEnd('/').removeSuffix("/chat/completions"), model = model.trim()), key.trim())) },
-                enabled = !state.busy && base.isNotBlank() && model.isNotBlank() && key.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(if (state.busy) "Подключаю…" else "Сохранить и подключить") }
+            Button(onClick = { controller.connect(entered) }, enabled = !state.busy && !configured && base.isNotBlank() && model.isNotBlank() && key.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()) { Text(if (state.busy) "Сохраняю…" else if (configured) "Сохранено" else "Сохранить и подключить") }
+            if (configured) {
+                Text("✓ Настройки сохранены. Модель готова к отправке сообщения.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                FilledTonalButton(onClick = dismiss, modifier = Modifier.fillMaxWidth()) { Text("К чату") }
+            }
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Text("Доступ к данным", style = MaterialTheme.typography.titleLarge)

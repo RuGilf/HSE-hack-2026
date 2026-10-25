@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 import ru.lifety.feature.assistant.agent.*
 import ru.lifety.feature.assistant.ai.assistantLocalTime
+import com.mikepenz.markdown.m3.Markdown
 
 @Composable internal fun AgentActivity(messages: List<AgentMessage>, busy: Boolean) {
     val calls = messages.flatMap { it.calls }.takeLast(8)
@@ -29,15 +30,15 @@ import ru.lifety.feature.assistant.ai.assistantLocalTime
                 val status = receipt?.let { runCatching { agentJson.parseToJsonElement(it.text).jsonObject["status"]?.jsonPrimitive?.content }.getOrNull() }
                 Text((if (receipt == null) "◌ " else if (status in setOf("ok", "archived", "offloaded", "awaiting_approval")) "✓ " else "• ") + actionLabel(call.name),
                     style = MaterialTheme.typography.bodySmall)
-                Text(actionDetail(call), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(agentActionDetail(call), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else Text("Нажмите, чтобы посмотреть действия", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
-private fun actionDetail(call: ToolCall): String {
+internal fun agentActionDetail(call: ToolCall): String {
     val args = runCatching { agentJson.parseToJsonElement(call.arguments).jsonObject }.getOrNull()
-    val path = args?.get("path")?.jsonPrimitive?.content.orEmpty()
+    val path = (args?.get("path") as? JsonPrimitive)?.takeIf { it.isString }?.content.orEmpty()
     return when {
         path.startsWith("data/expenses") -> "Расходы"
         path.startsWith("data/tasks") -> "Задачи"
@@ -112,7 +113,7 @@ internal fun describeAgentAction(kind: String, body: JsonObject): String {
             Text("Сохранённое", style = MaterialTheme.typography.titleLarge)
             if (content != null) {
                 TextButton(onClick = { content = null }) { Text("← К списку") }
-                SelectionContainer { Text(content!!, style = MaterialTheme.typography.bodyMedium) }
+                SelectionContainer { Markdown(content!!, modifier = Modifier.fillMaxWidth()) }
             } else {
                 Text("Память о вас", style = MaterialTheme.typography.titleMedium)
                 val facts = state.view.document.facts.filter { state.view.document.scopes.memory && AgentRunner.factAllowed(it, state.view.document.scopes) }
