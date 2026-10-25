@@ -80,8 +80,9 @@ class AgentWorkspace(private val disk: AgentDisk, private val scriptTimeoutMilli
     suspend fun clear() = lock.withLock { disk.paths().forEach { disk.delete(it) } }
     suspend fun removeGenerated(prefix: String) = lock.withLock { disk.paths().filter { it.startsWith(prefix) }.forEach { disk.delete(it) } }
 
-    suspend fun runScript(path: String): JsonObject {
+    suspend fun runScript(path: String, content: String? = null, expectedRevision: String = ""): JsonObject {
         if (!path.startsWith("scripts/") || !path.endsWith(".js")) throw AgentFault("invalid_path", "Сохраните JavaScript в scripts/*.js перед запуском.")
+        if (content != null) write(path, content, expectedRevision)
         val code = read(path)
         if (code.length > 64000) throw AgentFault("file_limit", "Скрипт превышает 64000 символов")
         val output = StringBuilder()
