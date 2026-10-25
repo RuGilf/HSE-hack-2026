@@ -51,6 +51,13 @@ APK относительно корня worktree:
 Подробные правила и размеры — в `docs/DESIGN_SYSTEM.md`, результаты проверки
 и ограничения измерения плавности — в [docs/UI_POLISH.md](docs/UI_POLISH.md).
 
+## OpenRouter API
+
+Проверен OpenRouter с `nvidia/nemotron-3-ultra-550b-a55b:free`.
+Полный endpoint для существующего экрана, конфигурация headless runtime,
+live tests и ограничения — [docs/OPENROUTER_API.md](docs/OPENROUTER_API.md).
+Ключи в проект и APK не включаются.
+
 ## Движок агента (API, без подключения UI)
 
 Включена ветка `codex/native-agent-harness` (`df063fa`): локальная рабочая папка,
