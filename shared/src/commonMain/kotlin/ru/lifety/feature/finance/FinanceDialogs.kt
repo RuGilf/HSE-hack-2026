@@ -76,6 +76,11 @@ internal fun ExpenseEditorDialog(
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     isError = attempted && merchant.isBlank(), enabled = !locked)
                 Text("Категория", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val suggestedCategory = inferFinanceCategory(merchant)
+                if (category == "other" && suggestedCategory != "other") {
+                    SuggestionChip(onClick = { category = suggestedCategory }, enabled = !locked,
+                        label = { Text("Предложение: ${categoryTitle(suggestedCategory)}") })
+                }
                 // Pairs keep category labels readable within the sheet.
                 (financeCategories.keys + category).distinct().chunked(2).forEach { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -114,9 +119,9 @@ internal fun BudgetDialog(currency: String, initial: Long?, onDismiss: () -> Uni
     var input by rememberSaveable { mutableStateOf(initial?.let(::minorAmountInput) ?: "") }
     var attempted by remember { mutableStateOf(false) }
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text("Бюджет · $currency") },
+        title = { Text("Месячный лимит · $currency") },
         text = { Column {
-            Text("Для выбранного периода. Хранится только в текущей сессии экрана.")
+            Text("Для текущего календарного месяца. Хранится в сессии экрана.")
             OutlinedTextField(input, { input = it.take(40) }, label = { Text("Сумма бюджета") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true,
                 isError = attempted && parseMinorAmount(input) == null)

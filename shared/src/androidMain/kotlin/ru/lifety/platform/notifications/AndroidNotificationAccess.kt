@@ -51,7 +51,7 @@ fun AndroidNotificationAccess() {
                 Text(label, modifier = Modifier.padding(top = 12.dp))
             }
         }
-        if (!registered) Text("Автоимпорт требует регистрации сервиса в Manifest (фрагмент подготовлен для Codex 1).")
+        if (!registered) Text("Автоимпорт пока недоступен в этой сборке. Можно попробовать демо ниже.")
         Text(when {
             consent && granted && selected.isNotEmpty() -> "Автоимпорт включён. Покупки ожидают подтверждения здесь."
             consent && !granted -> "Разрешите доступ в настройках Android."

@@ -1,5 +1,6 @@
 package ru.lifety.feature.finance
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -34,6 +36,7 @@ fun FinanceScreen(modifier: Modifier = Modifier) {
         onSave = { controller?.save(it) ?: false },
         onDelete = { controller?.delete(it) ?: false },
         onRetry = { controller?.retry() },
+        onConfirm = { controller?.confirmNotification(it) ?: false },
         modifier = modifier,
     )
 }
@@ -47,12 +50,13 @@ fun FinanceContent(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     storageConnected: Boolean = true,
+    onConfirm: suspend (Expense) -> Boolean = onSave,
 ) {
     val scope = rememberCoroutineScope()
     val today = localFinanceDate(financeNow())
     var currency by rememberSaveable { mutableStateOf("RUB") }
     var fromText by rememberSaveable { mutableStateOf(today.copy(day = 1).toString()) }
-    var toText by rememberSaveable { mutableStateOf(today.toString()) }
+    var toText by rememberSaveable { mutableStateOf(today.firstDayOfNextMonth().previousDay().toString()) }
     var allTime by rememberSaveable { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Expense?>(null) }
     var suggestionId by remember { mutableStateOf<String?>(null) }
@@ -60,22 +64,35 @@ fun FinanceContent(
     var deleting by remember { mutableStateOf<Expense?>(null) }
     var showBudget by remember { mutableStateOf(false) }
     // shortcut: session-only configuration; durable budgets need a Core preferences contract.
-    var budgets by remember { mutableStateOf(emptyMap<String, Long>()) }
+    val budgetMonth = today.toString().take(7)
+    var budgets by rememberSaveable(budgetMonth, stateSaver = mapSaver<Map<String, Long>>(
+        save = { mapOf<String, Any?>("month" to budgetMonth) + it },
+        restore = { saved -> restoreMonthlyBudgets(saved, budgetMonth) },
+    )) { mutableStateOf(emptyMap<String, Long>()) }
     val pending by FinanceNotifications.inbox.pending.collectAsState()
+    val importResult by FinanceNotifications.intake.lastResult.collectAsState()
     val savedIds = state.expenses.map { it.id }.toSet()
     val suggestions = pending.filterNot { it.id in savedIds }
     val from = FinanceDate.parse(fromText)
     val to = FinanceDate.parse(toText)
     val periodValid = allTime || (from != null && to != null && from <= to)
-    val result = remember(state.expenses, currency, from, to, allTime) {
+    val bounds = remember(from, to, allTime) {
         runCatching {
             require(periodValid)
-            summarizeExpenses(state.expenses, currency,
-                if (allTime) Long.MIN_VALUE else financeDayStart(requireNotNull(from)),
-                if (allTime) Long.MAX_VALUE else financeDayStart(requireNotNull(to).nextDay()))
+            (if (allTime) Long.MIN_VALUE else financeDayStart(requireNotNull(from))) to
+                (if (allTime) Long.MAX_VALUE else financeDayStart(requireNotNull(to).nextDay()))
+        }.getOrNull()
+    }
+    val summary = remember(state.expenses, currency, bounds) {
+        bounds?.let { (start, end) -> runCatching { summarizeExpenses(state.expenses, currency, start, end) }.getOrNull() }
+    }
+    val quickTotals = remember(state.expenses, currency, today) {
+        FinancePeriod.entries.associateWith { period ->
+            val range = financePeriodDates(period, today)
+            runCatching { summarizeExpenses(state.expenses, currency,
+                financeDayStart(range.from), financeDayStart(range.until)).totalMinor }.getOrNull()
         }
     }
-    val summary = result.getOrNull()
 
     Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
@@ -93,7 +110,7 @@ fun FinanceContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (!storageConnected) item {
-            Notice("Хранилище не подключено. Codex 1 должен передать Repositories в LifetyApp. Расходы пока нельзя сохранять.")
+            Notice("Локальное хранилище пока недоступно. Сохранение расходов станет доступно после подключения.")
         }
         if (state.error != null) item {
             Notice(state.error)
@@ -102,24 +119,38 @@ fun FinanceContent(
         if (state.loading || state.saving) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !allTime && fromText == today.copy(day = 1).toString(),
-                    onClick = { allTime = false; fromText = today.copy(day = 1).toString(); toText = today.toString() },
-                    label = { Text("Этот месяц") })
-                FilterChip(selected = false, onClick = {
-                    var start = today
-                    repeat(6) { start = start.previousDay() }
-                    allTime = false; fromText = start.toString(); toText = today.toString()
-                }, label = { Text("7 дней") })
+                FinancePeriod.entries.forEach { period ->
+                    val range = financePeriodDates(period, today)
+                    val end = range.until.previousDay().toString()
+                    FilterChip(selected = !allTime && fromText == range.from.toString() && toText == end,
+                        onClick = { allTime = false; fromText = range.from.toString(); toText = end },
+                        label = { Text(period.title) })
+                }
                 FilterChip(selected = allTime, onClick = { allTime = true }, label = { Text("Всё время") })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LifetyDateField("С", fromText, { fromText = it; allTime = false }, modifier = Modifier.weight(1f))
                 LifetyDateField("По", toText, { toText = it; allTime = false }, modifier = Modifier.weight(1f))
             }
-            Text("Даты в часовом поясе устройства", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Даты в часовом поясе устройства · неделя — последние 7 дней", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (listOf("RUB", "USD", "EUR") + state.expenses.map { it.currency }).distinct().forEach { code ->
                     FilterChip(selected = currency == code, onClick = { currency = code }, label = { Text(code) })
+                }
+            }
+        }
+        if (storageConnected && !state.loading) item {
+            Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FinancePeriod.entries.forEach { period ->
+                        Column(Modifier.weight(1f)) {
+                            Text(period.title, style = MaterialTheme.typography.labelMedium)
+                            val amount = quickTotals[period]
+                            Text(amount?.let { formatMoney(it, currency) } ?: "Ошибка суммы",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (amount == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
                 }
             }
         }
@@ -132,35 +163,30 @@ fun FinanceContent(
                         Text("Расходы за период · $currency", style = MaterialTheme.typography.labelLarge)
                         Text(formatMoney(summary.totalMinor, currency), style = MaterialTheme.typography.headlineLarge)
                         Text("${summary.expenses.size} операций · валюты считаются отдельно")
-                        budgets[currency]?.let { budget ->
-                            val remaining = remainingBudget(budget, summary.totalMinor)
-                            Text("Бюджет: ${formatMoney(budget, currency)}")
-                            Text((if (remaining < 0) "Превышение: " else "Остаток: ") +
-                                formatMoney(if (remaining < 0) -remaining else remaining, currency),
-                                color = if (remaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-                        }
-                        TextButton(onClick = { showBudget = true }) { Text("Бюджет на период (в этой сессии)") }
+
                     }
                 }
             }
-            if (summary.byCategory.isNotEmpty()) item {
-                Text("По категориям", style = MaterialTheme.typography.titleMedium)
-                summary.byCategory.entries.sortedByDescending { it.value }.forEach { (category, amount) ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(categoryTitle(category), Modifier.weight(1f))
-                        Text(formatMoney(amount, currency))
-                    }
-                }
-            }
+            if (summary.byCategory.isNotEmpty()) item { CategoryChart(summary, currency) }
         }
         item {
+            if (storageConnected && !state.loading) {
+                MonthlyBudgetCard(budgetMonth, currency, quickTotals[FinancePeriod.MONTH], budgets[currency],
+                    onEdit = { showBudget = true })
+            }
             HorizontalDivider()
             Text("Из уведомлений", style = MaterialTheme.typography.titleMedium)
             Text("Только покупки. Перед записью проверьте сумму, магазин и дату.", style = MaterialTheme.typography.bodySmall)
             FinanceNotificationAccess()
+            if (importResult == ImportOutcome.UNREADABLE || importResult == ImportOutcome.UNRECOGNIZED) {
+                Text(if (importResult == ImportOutcome.UNREADABLE)
+                    "Содержимое банковского уведомления скрыто или недоступно. Добавьте расход вручную."
+                    else "Не удалось распознать сумму или формат уведомления. Добавьте расход вручную.",
+                    style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { FinanceNotifications.intake.clearResult() }) { Text("Понятно") }
+            }
             OutlinedButton(onClick = {
-                val demo = DemoNotifications.purchase(financeNow(), "demo-${financeNow()}-${kotlin.random.Random.nextLong()}")
-                BankNotificationParser().parse(demo)?.let { FinanceNotifications.inbox.offer(it) }
+                FinanceNotifications.intake.demo(financeNow(), "demo-${financeNow()}-${kotlin.random.Random.nextLong()}")
             }) { Text("ДЕМО: тестовое уведомление") }
             Text("Демо не требует разрешений. Тестовая запись будет отмечена [ДЕМО].", style = MaterialTheme.typography.bodySmall)
         }
@@ -181,16 +207,17 @@ fun FinanceContent(
         }
         item { Text("Транзакции", style = MaterialTheme.typography.titleLarge) }
         // Keep individual entries accessible even if a corrupt total cannot be calculated.
-        val visible = summary?.expenses ?: state.expenses.filter { it.currency == currency }
-            .sortedWith(compareByDescending<Expense> { it.timestamp }.thenBy { it.id })
-        if (visible.isEmpty() && !state.loading) item {
+        val visible = summary?.expenses ?: bounds?.let { (start, end) ->
+            selectExpenses(state.expenses, currency, start, end)
+        }.orEmpty()
+        if (visible.isEmpty() && !state.loading && periodValid && storageConnected) item {
             LifetyEmptyState("Пока без расходов", "Добавь первый расход, чтобы видеть свой ритм трат.",
                 emotion = LifetyEmotion.Calm, mascotSize = 80.dp)
         }
         visible.groupBy { localFinanceDate(it.timestamp) }.forEach { (date, expenses) ->
             item(key = "date:$date") { Text(date.toString(), style = MaterialTheme.typography.titleSmall) }
             items(expenses, key = { "expense:${it.id}" }) { expense ->
-                ExpenseRow(expense, enabled = !state.saving, onEdit = {
+                ExpenseRow(expense, enabled = storageConnected && !state.saving, onEdit = {
                     editing = expense; suggestionId = null; showEditor = true
                 }, onDelete = { deleting = expense })
             }
@@ -201,7 +228,8 @@ fun FinanceContent(
 
     if (showEditor) ExpenseEditorDialog(initial = editing, busy = state.saving, error = state.error,
         onDismiss = { showEditor = false }, onSave = { expense ->
-            if (onSave(expense)) {
+            val saved = if (suggestionId != null) onConfirm(expense) else onSave(expense)
+            if (saved) {
                 suggestionId?.let { FinanceNotifications.inbox.dismiss(it) }
                 showEditor = false
                 true

@@ -2,6 +2,7 @@ package ru.lifety.feature.finance.notifications
 
 import ru.lifety.core.model.Expense
 import ru.lifety.feature.finance.parseMinorAmount
+import ru.lifety.feature.finance.inferFinanceCategory
 
 enum class OperationType { PURCHASE, INCOME, TRANSFER }
 
@@ -28,7 +29,7 @@ data class ExpenseSuggestion(
         require(operation == OperationType.PURCHASE)
         return Expense(id, amountMinor, currency,
             (if (isDemo) "[ДЕМО] " else "") + merchant,
-            inferExpenseCategory(merchant), timestamp,
+            inferFinanceCategory(merchant), timestamp,
             if (isDemo) "demo-notification" else "notification:$packageName")
     }
 }
@@ -107,16 +108,6 @@ private class KeywordBankMessageParser : BankMessageParser {
             ?: "Неизвестный магазин").take(100)
         return ExpenseSuggestion("notification:${notification.eventId}", notification.packageName,
             minor, currency, merchant, notification.timestamp, operation, notification.isDemo)
-    }
-}
-
-fun inferExpenseCategory(merchant: String): String {
-    val name = merchant.lowercase()
-    return when {
-        listOf("pyater", "пятёр", "пятер", "magnit", "магнит", "coffee", "кофе", "cafe", "кафе", "metro", "перекрест").any { it in name } -> "food"
-        listOf("taxi", "такси", "transport", "транспорт", "metro ticket").any { it in name } -> "transport"
-        listOf("аптек", "pharma", "clinic", "клиник").any { it in name } -> "health"
-        else -> "other"
     }
 }
 

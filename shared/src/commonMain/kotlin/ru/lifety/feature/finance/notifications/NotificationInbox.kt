@@ -27,4 +27,5 @@ class NotificationInbox {
 
 object FinanceNotifications {
     val inbox = NotificationInbox()
+    val intake = NotificationIntake(inbox)
 }
