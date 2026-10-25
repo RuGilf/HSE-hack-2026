@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -42,14 +43,22 @@ class FinanceController(private val repository: ExpenseRepository, private val s
         }
     }
 
-    suspend fun save(expense: Expense): Boolean {
+    suspend fun save(expense: Expense): Boolean =
+        if (validate(expense)) write { repository.upsert(expense) } else false
+
+    /** Replayed confirmation must not overwrite a transaction the user already corrected. */
+    suspend fun confirmNotification(expense: Expense): Boolean = if (validate(expense)) write {
+        if (repository.observeAll().first().none { it.id == expense.id }) repository.upsert(expense)
+    } else false
+
+    private fun validate(expense: Expense): Boolean {
         if (expense.id.isBlank() || expense.amountMinor <= 0 || expense.merchant.isBlank() ||
             expense.merchant.length > 120 || expense.category.isBlank() || expense.category.length > 80 ||
             !Regex("[A-Z]{3}").matches(expense.currency)) {
             mutableState.update { it.copy(error = "Проверьте магазин, сумму, валюту и категорию.") }
             return false
         }
-        return write { repository.upsert(expense) }
+        return true
     }
 
     suspend fun delete(id: String): Boolean = write { repository.delete(id) }

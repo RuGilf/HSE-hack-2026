@@ -86,6 +86,23 @@ class FinanceControllerTest {
             assertTrue(controller.state.value.expenses.isEmpty())
         } finally { scope.cancel() }
     }
+    @Test fun repeatedNotificationConfirmationPreservesTheAlreadyEditedExpense() = runBlocking {
+        val repository = FakeExpenses()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val controller = FinanceController(repository, scope)
+            val original = Expense("notification:stable", 10000, "RUB", "SHOP", "other", 100, "notification:bank")
+            assertTrue(controller.confirmNotification(original))
+            val edited = original.copy(amountMinor = 12000, category = "food")
+            assertTrue(controller.save(edited))
+            // A new subscription simulates reopening Finance after process/UI recreation.
+            val reopened = FinanceController(repository, scope)
+            assertTrue(reopened.confirmNotification(original))
+            assertEquals(listOf(edited), repository.values.value)
+            assertEquals(listOf(edited), reopened.state.value.expenses)
+        } finally { scope.cancel() }
+    }
+
     private class FakeExpenses : ExpenseRepository {
         val values = MutableStateFlow(emptyList<Expense>())
         var failure: Exception? = null

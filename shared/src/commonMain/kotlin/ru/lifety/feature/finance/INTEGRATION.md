@@ -105,3 +105,10 @@ background, dark surfaces, bright-green primary, white text and rounded shapes t
 Finance intentionally consumes `MaterialTheme.colorScheme` / `MaterialTheme.shapes`;
 it does not override the application's theme. The shared theme is required to display
 all screens consistently in the agreed dark concept.
+
+P1 follow-up: `NotificationIntake` now owns the pure consent/package gate, parser outcomes,
+and demo routing. A hidden or unrecognized message produces a user-visible fallback without
+storing its text or inventing a draft. Confirmation calls `FinanceController.confirmNotification`:
+it reads the current repository snapshot under the feature write mutex and skips an existing ID,
+preserving a previously edited transaction. Manual editing continues to use normal upsert.
+No additional Manifest or Core API changes are required beyond the fragment above.

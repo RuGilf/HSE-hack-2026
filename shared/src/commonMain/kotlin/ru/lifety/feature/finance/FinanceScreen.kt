@@ -28,6 +28,7 @@ fun FinanceScreen(modifier: Modifier = Modifier) {
         onSave = { controller?.save(it) ?: false },
         onDelete = { controller?.delete(it) ?: false },
         onRetry = { controller?.retry() },
+        onConfirm = { controller?.confirmNotification(it) ?: false },
         modifier = modifier,
     )
 }
@@ -41,6 +42,7 @@ fun FinanceContent(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     storageConnected: Boolean = true,
+    onConfirm: suspend (Expense) -> Boolean = onSave,
 ) {
     val scope = rememberCoroutineScope()
     val today = localFinanceDate(financeNow())
@@ -56,6 +58,7 @@ fun FinanceContent(
     // shortcut: session-only configuration; durable budgets need a Core preferences contract.
     var budgets by remember { mutableStateOf(emptyMap<String, Long>()) }
     val pending by FinanceNotifications.inbox.pending.collectAsState()
+    val importResult by FinanceNotifications.intake.lastResult.collectAsState()
     val savedIds = state.expenses.map { it.id }.toSet()
     val suggestions = pending.filterNot { it.id in savedIds }
     val from = FinanceDate.parse(fromText)
@@ -175,9 +178,15 @@ fun FinanceContent(
             Text("Из уведомлений", style = MaterialTheme.typography.titleMedium)
             Text("Только покупки. Перед записью проверьте сумму, магазин и дату.", style = MaterialTheme.typography.bodySmall)
             FinanceNotificationAccess()
+            if (importResult == ImportOutcome.UNREADABLE || importResult == ImportOutcome.UNRECOGNIZED) {
+                Text(if (importResult == ImportOutcome.UNREADABLE)
+                    "Содержимое банковского уведомления скрыто или недоступно. Добавьте расход вручную."
+                    else "Не удалось распознать сумму или формат уведомления. Добавьте расход вручную.",
+                    style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { FinanceNotifications.intake.clearResult() }) { Text("Понятно") }
+            }
             OutlinedButton(onClick = {
-                val demo = DemoNotifications.purchase(financeNow(), "demo-${financeNow()}-${kotlin.random.Random.nextLong()}")
-                BankNotificationParser().parse(demo)?.let { FinanceNotifications.inbox.offer(it) }
+                FinanceNotifications.intake.demo(financeNow(), "demo-${financeNow()}-${kotlin.random.Random.nextLong()}")
             }) { Text("ДЕМО: тестовое уведомление") }
             Text("Демо не требует разрешений. Тестовая запись будет отмечена [ДЕМО].", style = MaterialTheme.typography.bodySmall)
         }
@@ -214,7 +223,8 @@ fun FinanceContent(
 
     if (showEditor) ExpenseEditorDialog(initial = editing, busy = state.saving, error = state.error,
         onDismiss = { showEditor = false }, onSave = { expense ->
-            if (onSave(expense)) {
+            val saved = if (suggestionId != null) onConfirm(expense) else onSave(expense)
+            if (saved) {
                 suggestionId?.let { FinanceNotifications.inbox.dismiss(it) }
                 showEditor = false
                 true
