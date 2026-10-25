@@ -6,6 +6,8 @@ Finance обновлён до `origin/feature/finance` (`c703a1f`): CRUD, пер
 категории, месячный лимит и подтверждённый импорт уведомлений.
 Из `origin/feature/assistant` (`e30a688`) подключены обзор локальных данных,
 ручной ввод сна/шагов и опциональный AI с явным предпросмотром контекста.
+Обновление `feature/assistant` (`14a4311`) добавляет Android Health Connect:
+выбор сна/шагов, явное чтение, предпросмотр и подтверждение локального сохранения.
 Текущая интеграция описана в [docs/INTEGRATION_STATUS.md](docs/INTEGRATION_STATUS.md).
 
 Рабочая ветка: **feature/core**, worktree: `/Users/rugilf/Projects/lifety-core`.
@@ -68,6 +70,8 @@ APK относительно корня worktree:
 - Главная: сегодняшние задачи и дедлайны, суммы текущего месяца отдельно по валютам,
   последние показатели здоровья. Без стартовых вымышленных данных.
 - Здоровье: ручной ввод часов/минут сна и шагов с сохранением в общей SQLite.
+  Android 9+ также предлагает импорт через Health Connect: отдельные разрешения
+  чтения, предпросмотр и подтверждение. При отсутствии провайдера ручной ввод доступен.
 - Assistant: явный выбор категорий данных, предпросмотр неизменяемого JSON-контекста,
   затем запрос к выбранному HTTPS chat/completions API. Нужны свои ключ и модель.
   Разрешения выключены по умолчанию; ключ только в памяти процесса. Автоматических
@@ -85,7 +89,10 @@ APK относительно корня worktree:
 Модели и публичные repository interfaces не изменены. Формат SQLite-таблиц и
 schema version 1 сохранены: на этом этапе добавлены запросы, миграция не нужна.
 Нет сервера, регистрации, облачной БД, Firebase и внешних календарей.
-Health Connect/HealthKit не подключены; показатели вводятся вручную.
+Health Connect подключён только на Android 9+: сон за последние 24 часа, шаги
+с начала локального дня. Фонового импорта нет. На iOS остаётся ручной ввод;
+HealthKit не подключён. Особенности SDK и проверок — в
+`shared/src/commonMain/kotlin/ru/lifety/feature/health/INTEGRATION.md`.
 Planner P1 (напоминания о дедлайнах, повторы, приоритеты, длительность) не реализован.
 
 ## Структура кода
@@ -172,6 +179,11 @@ Android SDK **37**, Build Tools **36.0.0**, Xcode **27.1**.
 ./gradlew :androidApp:build :shared:testAndroidHostTest
 ./gradlew :shared:compileKotlinIosSimulatorArm64 :androidApp:build :shared:testAndroidHostTest
 ```
+
+После интеграции Health Connect (`14a4311`) повторена полная команда Android build,
+host tests и iOS compile: **92 теста без failures/errors/skipped**.
+Проверка слияния и ограничения SDK — [docs/ASSISTANT_MERGE_REVIEW.md](docs/ASSISTANT_MERGE_REVIEW.md).
+Следующие результаты описывают предыдущую проверку до этого обновления.
 
 - Android debug/release assembly и lint — **BUILD SUCCESSFUL**.
 - **71 host tests: 0 failures, 0 errors, 0 skipped**: Core/Planner, Finance/Notifications,

@@ -28,6 +28,8 @@ fun HealthScreen(modifier: Modifier = Modifier) {
         var hours by rememberSaveable { mutableStateOf("") }
         var minutes by rememberSaveable { mutableStateOf("") }
         var steps by rememberSaveable { mutableStateOf("") }
+        var importBusy by remember { mutableStateOf(false) }
+        val formEnabled = !state.saving && !importBusy
         val focus = LocalFocusManager.current
         val keyboard = LocalSoftwareKeyboardController.current
         val snackbar = remember { SnackbarHostState() }
@@ -45,26 +47,27 @@ fun HealthScreen(modifier: Modifier = Modifier) {
                         snapshot?.let { Text("Обновлено: ${healthRecordedAt(it.timestamp)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 }
+                HealthConnectSection(repository = repository, enabled = repository != null && !state.saving, onBusyChanged = { importBusy = it })
                 Text("Новая запись", style = MaterialTheme.typography.titleMedium)
                 Text("Сон за последнюю ночь и шаги за сегодня. Пустые поля останутся без данных.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(hours, { hours = it.take(4) }, Modifier.weight(1f), enabled = !state.saving, singleLine = true,
+                    OutlinedTextField(hours, { hours = it.take(4) }, Modifier.weight(1f), enabled = formEnabled, singleLine = true,
                         label = { Text("Сон, часы") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }))
-                    OutlinedTextField(minutes, { minutes = it.take(4) }, Modifier.weight(1f), enabled = !state.saving, singleLine = true,
+                    OutlinedTextField(minutes, { minutes = it.take(4) }, Modifier.weight(1f), enabled = formEnabled, singleLine = true,
                         label = { Text("Минуты") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }))
                 }
-                OutlinedTextField(steps, { steps = it.take(8) }, Modifier.fillMaxWidth(), enabled = !state.saving, singleLine = true,
+                OutlinedTextField(steps, { steps = it.take(8) }, Modifier.fillMaxWidth(), enabled = formEnabled, singleLine = true,
                     label = { Text("Шаги за сегодня") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { keyboard?.hide(); focus.clearFocus() }))
                 AnimatedVisibility(state.error != null, enter = LifetyMotion.RevealEnter, exit = LifetyMotion.RevealExit) {
                     Column {
                         Text(state.error.orEmpty(), color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = controller::reload, enabled = !state.saving) { Text("Обновить показатели") }
+                        TextButton(onClick = controller::reload, enabled = formEnabled) { Text("Обновить показатели") }
                     }
                 }
-                Button(onClick = { keyboard?.hide(); focus.clearFocus(); controller.save(hours, minutes, steps) }, enabled = repository != null && !state.saving,
+                Button(onClick = { keyboard?.hide(); focus.clearFocus(); controller.save(hours, minutes, steps) }, enabled = repository != null && formEnabled,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(if (state.saving) "Сохранение…" else "Сохранить на устройстве")
                 }

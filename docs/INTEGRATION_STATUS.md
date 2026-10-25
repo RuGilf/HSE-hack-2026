@@ -2,6 +2,8 @@
 
 После этой интеграции пользователь объединил PR #1 в main (`2518b8a`).
 Последующая доработка Android UI описана в [UI_POLISH.md](UI_POLISH.md).
+Новое обновление Health Connect (`14a4311`) интегрировано в `feature/core`
+поверх UI polish; подробности — [ASSISTANT_MERGE_REVIEW.md](ASSISTANT_MERGE_REVIEW.md).
 Ниже сохранён отчёт о первоначальном объединении функций.
 
 Ветка назначения: `feature/core`, worktree `/Users/rugilf/Projects/lifety-core`.

@@ -301,8 +301,14 @@ Codex 3 размещает AI-логику в `feature/assistant/ai/**`, исп�
 preview фиксирует JSON до явного Analyze; ключ хранится только в памяти процесса.
 Никаких записей в репозитории из AI. Полные контракты и ограничения —
 `C/feature/assistant/ai/README.md`. Health использует `HealthRepository.update`,
-Dashboard подписывается на все три общих repository Flow. Health Connect и
-HealthKit не подключены, новых permissions/Gradle-зависимостей нет.
+Dashboard подписывается на все три общих repository Flow. Android Health Connect импортирует сон и шаги только по явному действию,
+затем сохраняет точный предпросмотр через существующий HealthRepository.update
+после подтверждения. Разрешения AI от этого не меняются. На iOS остаётся ручной ввод;
+HealthKit не подключён. Android-only connect-client 1.2.0-alpha06 использует
+READ_SLEEP/READ_STEPS и Activity объяснения. SDK и его bound service включаются
+только на API 28+, minSdk приложения остаётся 24 с точечным overrideLibrary.
+Новых записей в Health Connect, фонового чтения и изменений SQL/DI нет.
+Точный workflow и ограничения — C/feature/health/INTEGRATION.md.
 
 Android notification adapter реализован Codex 2 в
 `ru.lifety.platform.notifications`. `ExpenseNotificationListener` зарегистрирован
