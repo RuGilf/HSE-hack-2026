@@ -104,7 +104,7 @@ class KtorAiProvider(private val clientFactory: () -> HttpClient = ::createHttpC
         try {
             val base = clientFactory()
             try {
-                val client = base.config { followRedirects = false; expectSuccess = true }
+                val client = base.config { followRedirects = false; expectSuccess = true; configureAiTimeouts() }
                 try {
                     val payload = CompletionRequest(settings.model.trim(), listOf(
                         Message("system", SYSTEM_PROMPT + "\n" + goal.instruction),

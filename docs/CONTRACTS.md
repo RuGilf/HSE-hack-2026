@@ -419,3 +419,13 @@ Android minSdk 24, compileSdk/targetSdk 37.
 [kotlinx-datetime](https://github.com/Kotlin/kotlinx-datetime),
 [Android API desugaring](https://developer.android.com/studio/write/java8-support).
 Фактические результаты сборки и ограничения проверки — в README.
+
+## API compatibility: OpenRouter
+
+После main 66af7d7 проверен OpenRouter / Nemotron. Общая core HTTP factory
+сохраняет таймауты 15/30/30 секунд; оба AI clients отдельно задают request/socket
+120 секунд. Бюджет runner 180 секунд и cancellation сохраняются.
+AgentMessage/ModelReply получили только optional reasoningDetails/reasoning для
+точного round trip метаданных провайдера; старые private checkpoints читаются.
+Core models, repository interfaces, SQL и public screen signatures не менялись.
+Настройки и фактические live test results — docs/OPENROUTER_API.md.

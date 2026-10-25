@@ -40,7 +40,8 @@ No models, repository interfaces, routes, Gradle, Manifest or SQL schema changes
   Embedded credentials, query parameters, fragments and non-HTTPS URLs are rejected.
   Requests use bearer authentication, JSON response mode and a supporting system prompt.
   Redirects are disabled. The existing Core Ktor factory supplies the real platform
-  engine and timeouts; clients are closed after the request. Feature code does not schedule retries.
+  engine; AI-only request/socket timeout is 120 seconds and connect timeout 15 seconds.
+  Clients are closed after the request. Feature code does not schedule retries.
 - Network/HTTP/malformed response failures become recoverable UI messages. Cancellation
   propagates. Provider exception text and error bodies are never displayed or logged.
 - Structured recommendations include explanations and optional task references and
@@ -113,3 +114,9 @@ All paths below start with `shared/src/<source set>/kotlin/ru/lifety/feature/`.
   Manifest, route, model, repository-contract or schema requirements; Core must provide
   the existing shared repository container. Budget limits and Health Connect need the
   separate Core/Finance integration described above.
+
+## OpenRouter verification update
+
+The current UI API path has an opt-in LiveAiProviderTest and AI-specific timeouts.
+See docs/OPENROUTER_API.md for the tested model, endpoint and actual results.
+The earlier Windows handoff above is historical. No credentials are embedded.

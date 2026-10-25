@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import ru.lifety.core.network.createHttpClient
+import ru.lifety.feature.assistant.ai.configureAiTimeouts
 
 @Serializable
 data class ProviderSettings(val baseUrl: String = "https://api.openai.com/v1", val model: String = "",
@@ -36,6 +37,11 @@ internal fun requestMessages(request: ModelRequest) = buildJsonArray {
         put("role", message.role)
         put("content", if (message.text.isEmpty() && message.calls.isNotEmpty()) JsonNull else JsonPrimitive(message.text))
         message.callId?.let { put("tool_call_id", it) }
+        // Keep provider reasoning blocks verbatim across tool calls, including opaque signatures.
+        if (message.role == "assistant") {
+            message.reasoningDetails?.let { put("reasoning_details", it) }
+                ?: message.reasoning?.let { put("reasoning", it) }
+        }
         if (message.calls.isNotEmpty()) put("tool_calls", buildJsonArray {
             for (call in message.calls) add(buildJsonObject {
                 put("id", call.id); put("type", "function")
@@ -62,7 +68,7 @@ class OpenAiCompatibleModel(private val settings: ProviderSettings, private val 
     init {
         settings.validate()
         if (key.isBlank() || key.any { it == '\r' || it == '\n' }) throw AgentFault("settings", "Укажите корректный API-ключ")
-        client = createHttpClient().config { followRedirects = false; expectSuccess = false }
+        client = createHttpClient().config { followRedirects = false; expectSuccess = false; configureAiTimeouts() }
     }
 
     override suspend fun complete(request: ModelRequest): ModelReply = try {
@@ -102,7 +108,10 @@ class OpenAiCompatibleModel(private val settings: ProviderSettings, private val 
             }
             ModelReply(message["content"]?.takeUnless { it is JsonNull }?.jsonPrimitive?.content.orEmpty(), calls,
                 choice["finish_reason"]?.jsonPrimitive?.content in setOf("length", "content_filter"),
-                root["usage"]?.jsonObject?.get("prompt_tokens")?.jsonPrimitive?.intOrNull)
+                root["usage"]?.jsonObject?.get("prompt_tokens")?.jsonPrimitive?.intOrNull,
+                message["reasoning_details"]?.takeUnless { it is JsonNull }?.jsonArray,
+                if (message["reasoning_details"] == null || message["reasoning_details"] is JsonNull)
+                    message["reasoning"]?.takeUnless { it is JsonNull }?.jsonPrimitive?.content else null)
         }
     } catch (cancelled: CancellationException) { throw cancelled }
     catch (fault: AgentFault) { throw fault }

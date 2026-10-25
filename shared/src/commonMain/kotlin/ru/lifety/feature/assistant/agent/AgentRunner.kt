@@ -117,7 +117,8 @@ class AgentRunner(
             val oldIds = document.messages.flatMap { it.calls }.map { it.id }.toSet()
             if (reply.text.length > 20000 || reply.calls.size > 12 || reply.calls.any { it.id.isBlank() || it.id.length > 200 || it.arguments.length > 32000 || it.id in oldIds } ||
                 reply.calls.map { it.id }.distinct().size != reply.calls.size) throw AgentFault("protocol", "Некорректный ответ модели или повторный ID инструмента")
-            append(AgentMessage(id(), "assistant", reply.text, reply.calls, turn = user.turn))
+            append(AgentMessage(id(), "assistant", reply.text, reply.calls, turn = user.turn,
+                reasoningDetails = reply.reasoningDetails, reasoning = reply.reasoning))
             if (reply.calls.isEmpty()) {
                 if (reply.text.isBlank()) throw AgentFault("empty", "API вернул пустой ответ")
                 mutableState.value = state.value.copy(phase = RunPhase.IDLE)

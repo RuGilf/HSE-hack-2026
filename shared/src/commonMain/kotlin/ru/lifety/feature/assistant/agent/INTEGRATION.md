@@ -214,3 +214,11 @@ AgentRuntime вместо одноразового пути ContextBuilder -> Ai
   Android; это само по себе не блокер. С Android 7 callbacks идут на main thread,
   а minSdk проекта 24. Заявленный Binder-thread race этим путём не подтверждён.
   Источник: https://developer.android.com/reference/android/service/notification/NotificationListenerService
+
+## OpenRouter compatibility update
+
+Provider reasoning_details are retained verbatim through tool calls and private checkpoints;
+plaintext reasoning is supported when details are absent. Existing checkpoints remain readable.
+AI request/socket timeout is 120 seconds; the total runner budget and cancellation still apply.
+OpenRouter baseUrl is https://openrouter.ai/api/v1. Exact tested model/configuration and
+results are in docs/OPENROUTER_API.md. No key is stored in this guide or supplied by default.
