@@ -2,8 +2,8 @@ package ru.lifety.app.navigation
 
 /** Stable route identifiers; titles may be localized without changing routes. */
 enum class AppDestination(val route: String, val title: String) {
-    DASHBOARD("dashboard", "Обзор"),
-    TASKS("tasks", "Задачи"),
+    DASHBOARD("dashboard", "Главная"),
+    TASKS("tasks", "План"),
     CALENDAR("calendar", "Календарь"),
     FINANCE("finance", "Финансы"),
     ASSISTANT("assistant", "Ассистент"),

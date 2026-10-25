@@ -13,7 +13,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ru.lifety.core.model.Expense
+import ru.lifety.core.ui.LifetyDateField
+import ru.lifety.core.ui.LifetyIcon
+import ru.lifety.core.ui.LifetySymbol
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ExpenseEditorDialog(
     initial: Expense?,
@@ -35,44 +41,57 @@ internal fun ExpenseEditorDialog(
     val minor = parseMinorAmount(amount)
     val valid = merchant.isNotBlank() && minor != null && parsedDate != null
     val locked = busy || submitting
-    AlertDialog(
-        onDismissRequest = { if (!locked) onDismiss() },
-        title = { Text(when {
-            initial?.source == "demo-notification" -> "Подтвердить ДЕМО-расход"
-            initial?.source?.startsWith("notification:") == true -> "Проверить расход"
-            initial == null -> "Новый расход"
-            else -> "Изменить расход"
-        }) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(merchant, { merchant = it.take(120) }, label = { Text("Магазин") },
-                    singleLine = true, isError = attempted && merchant.isBlank(), enabled = !locked)
+    val currentLocked by rememberUpdatedState(locked)
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden || !currentLocked })
+    ModalBottomSheet(onDismissRequest = { if (!locked) onDismiss() }, sheetState = sheet,
+        containerColor = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding().padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(when {
+                    initial?.source == "demo-notification" -> "Подтвердить ДЕМО-расход"
+                    initial?.source?.startsWith("notification:") == true -> "Проверить расход"
+                    initial == null -> "Новый расход"
+                    else -> "Изменить расход"
+                }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss, enabled = !locked, modifier = Modifier.semantics { contentDescription = "Закрыть расход" }) {
+                    LifetyIcon(LifetySymbol.Close, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(amount, { amount = it.take(40) }, label = { Text("Сумма") },
+                    textStyle = MaterialTheme.typography.headlineLarge,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true, isError = attempted && minor == null, enabled = !locked,
-                    supportingText = { Text("Больше нуля, не более двух знаков после запятой") })
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    isError = attempted && minor == null, enabled = !locked,
+                    supportingText = { Text("Больше нуля, до двух знаков после запятой") })
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     (listOf("RUB", "USD", "EUR") + currency).distinct().forEach { code ->
                         FilterChip(selected = currency == code, enabled = !locked,
                             onClick = { currency = code }, label = { Text(code) })
                     }
                 }
-                Text("Категория", style = MaterialTheme.typography.labelLarge)
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    (financeCategories.keys + category).distinct().forEach { key ->
-                        FilterChip(selected = category == key, enabled = !locked,
-                            onClick = { category = key }, label = { Text(categoryTitle(key)) })
+                OutlinedTextField(merchant, { merchant = it.take(120) }, label = { Text("Магазин") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    isError = attempted && merchant.isBlank(), enabled = !locked)
+                Text("Категория", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Two compact rows keep categories visible without widening the sheet.
+                (financeCategories.keys + category).distinct().chunked(2).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { key ->
+                            FilterChip(selected = category == key, enabled = !locked,
+                                onClick = { category = key }, label = { Text(categoryTitle(key)) })
+                        }
                     }
                 }
-                OutlinedTextField(date, { date = it.take(10) }, label = { Text("Дата: ГГГГ-ММ-ДД") },
-                    singleLine = true, isError = attempted && parsedDate == null, enabled = !locked)
-                if (attempted && !valid) Text("Проверьте магазин, сумму и дату.", color = MaterialTheme.colorScheme.error)
+                LifetyDateField("Дата расхода", date, { date = it }, enabled = !locked)
+                if (attempted && !valid) Text("Проверь магазин, сумму и дату.", color = MaterialTheme.colorScheme.error)
                 if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
-                if (initial?.source == "demo-notification") Text("Тестовая запись будет сохранена с меткой ДЕМО.")
+                if (initial?.source == "demo-notification") Text("Тестовая запись будет сохранена с меткой ДЕМО.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        },
-        confirmButton = {
-            TextButton(enabled = !locked, onClick = {
+            Button(enabled = !locked, modifier = Modifier.fillMaxWidth().height(52.dp), onClick = {
                 attempted = true
                 if (valid) {
                     submitting = true
@@ -86,9 +105,8 @@ internal fun ExpenseEditorDialog(
                     }
                 }
             }) { Text(if (locked) "Сохранение…" else "Сохранить") }
-        },
-        dismissButton = { TextButton(enabled = !locked, onClick = onDismiss) { Text("Отмена") } },
-    )
+        }
+    }
 }
 
 @Composable

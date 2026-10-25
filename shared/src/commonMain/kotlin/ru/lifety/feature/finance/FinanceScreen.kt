@@ -13,6 +13,13 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ru.lifety.core.model.Expense
 import ru.lifety.core.ui.LocalRepositories
+import ru.lifety.core.ui.LifetyDateField
+import ru.lifety.core.ui.LifetyEmptyState
+import ru.lifety.core.ui.LifetyEmotion
+import ru.lifety.core.ui.LifetyIcon
+import ru.lifety.core.ui.LifetySymbol
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import ru.lifety.feature.finance.notifications.*
 
 @Composable
@@ -70,18 +77,21 @@ fun FinanceContent(
     }
     val summary = result.getOrNull()
 
+    Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            if (storageConnected) FloatingActionButton(onClick = {
+                if (!state.loading && !state.saving) { editing = null; suggestionId = null; showEditor = true }
+            }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = androidx.compose.foundation.shape.CircleShape,
+                modifier = Modifier.semantics { contentDescription = "Добавить расход" }) {
+                LifetyIcon(LifetySymbol.Plus)
+            }
+        }) { padding ->
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Финансы", style = MaterialTheme.typography.headlineMedium)
-                Button(enabled = storageConnected && !state.loading && !state.saving,
-                    onClick = { editing = null; suggestionId = null; showEditor = true }) { Text("Добавить") }
-            }
-        }
         if (!storageConnected) item {
             Notice("Хранилище не подключено. Codex 1 должен передать Repositories в LifetyApp. Расходы пока нельзя сохранять.")
         }
@@ -103,14 +113,10 @@ fun FinanceContent(
                 FilterChip(selected = allTime, onClick = { allTime = true }, label = { Text("Всё время") })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = fromText, onValueChange = { fromText = it.take(10); allTime = false },
-                    label = { Text("С (ГГГГ-ММ-ДД)") }, singleLine = true,
-                    isError = !allTime && from == null, modifier = Modifier.weight(1f))
-                OutlinedTextField(value = toText, onValueChange = { toText = it.take(10); allTime = false },
-                    label = { Text("По (включительно)") }, singleLine = true,
-                    isError = !allTime && to == null, modifier = Modifier.weight(1f))
+                LifetyDateField("С", fromText, { fromText = it; allTime = false }, modifier = Modifier.weight(1f))
+                LifetyDateField("По", toText, { toText = it; allTime = false }, modifier = Modifier.weight(1f))
             }
-            Text("Даты в часовом поясе устройства", style = MaterialTheme.typography.bodySmall)
+            Text("Даты в часовом поясе устройства", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (listOf("RUB", "USD", "EUR") + state.expenses.map { it.currency }).distinct().forEach { code ->
                     FilterChip(selected = currency == code, onClick = { currency = code }, label = { Text(code) })
@@ -177,7 +183,10 @@ fun FinanceContent(
         // Keep individual entries accessible even if a corrupt total cannot be calculated.
         val visible = summary?.expenses ?: state.expenses.filter { it.currency == currency }
             .sortedWith(compareByDescending<Expense> { it.timestamp }.thenBy { it.id })
-        if (visible.isEmpty() && !state.loading) item { Text("За этот период расходов нет. Добавьте первый расход.") }
+        if (visible.isEmpty() && !state.loading) item {
+            LifetyEmptyState("Пока без расходов", "Добавь первый расход, чтобы видеть свой ритм трат.",
+                emotion = LifetyEmotion.Calm, mascotSize = 80.dp)
+        }
         visible.groupBy { localFinanceDate(it.timestamp) }.forEach { (date, expenses) ->
             item(key = "date:$date") { Text(date.toString(), style = MaterialTheme.typography.titleSmall) }
             items(expenses, key = { "expense:${it.id}" }) { expense ->
@@ -186,6 +195,8 @@ fun FinanceContent(
                 }, onDelete = { deleting = expense })
             }
         }
+    }
+
     }
 
     if (showEditor) ExpenseEditorDialog(initial = editing, busy = state.saving, error = state.error,

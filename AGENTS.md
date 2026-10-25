@@ -25,3 +25,7 @@ Public core models/repository signatures and all existing `XxxScreen(modifier)`
 entry points stay unchanged. Other agents consume `LocalRepositories`,
 `LocalPlannerNavigation` and optionally `LocalRootNavigator`; do not replace the
 composition root or edit another agent's feature implementation.
+
+For all UI changes read `docs/DESIGN_SYSTEM.md`. Use the root LifetyTheme,
+shared spacing/shapes and `LifetyMascot`; do not copy palettes or invent mock data
+from the reference. Primary navigation has five sections; calendar lives in Plan.

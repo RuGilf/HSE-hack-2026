@@ -16,7 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -33,6 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.lifety.core.model.Task
@@ -40,6 +43,10 @@ import ru.lifety.core.navigation.LocalPlannerNavigation
 import ru.lifety.core.planner.TaskFilter
 import ru.lifety.core.planner.TaskListViewModel
 import ru.lifety.core.planner.visibleTasks
+import ru.lifety.core.ui.LifetyEmptyState
+import ru.lifety.core.ui.LifetyEmotion
+import ru.lifety.core.ui.LifetyIcon
+import ru.lifety.core.ui.LifetySymbol
 import ru.lifety.core.ui.LocalRepositories
 import ru.lifety.core.ui.PlaceholderScreen
 import ru.lifety.core.ui.TaskCard
@@ -64,17 +71,16 @@ fun TasksScreen(modifier: Modifier = Modifier) {
     Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { planner?.createTask() }, expanded = true,
-                icon = { Text("+", style = MaterialTheme.typography.headlineSmall) }, text = { Text("Новая задача") })
+            if (state.tasks.isNotEmpty()) FloatingActionButton(onClick = { planner?.createTask() },
+                containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = androidx.compose.foundation.shape.CircleShape,
+                modifier = Modifier.semantics { contentDescription = "Добавить задачу" }) { LifetyIcon(LifetySymbol.Plus) }
         }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("ВАШ ПЛАН", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 16.dp))
-            Text("Задачи", style = MaterialTheme.typography.headlineLarge)
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Освободите голову для важного", style = MaterialTheme.typography.titleMedium)
-                    Text("${state.tasks.count { !it.isCompleted }} активных · ${state.tasks.count { it.isCompleted }} завершено", style = MaterialTheme.typography.bodyMedium)
-                }
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Твои задачи", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text("${state.tasks.count { !it.isCompleted }} активных · ${state.tasks.count { it.isCompleted }} готово",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TaskFilter.entries.forEach { item -> FilterChip(selected = filter == item, onClick = { filterName = item.name }, label = { Text(item.title) }) }
@@ -90,10 +96,13 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)) {
                         if (tasks.isEmpty()) item {
-                            Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(if (filter == TaskFilter.COMPLETED) "Завершённые задачи появятся здесь" else "Здесь пока свободно", style = MaterialTheme.typography.titleLarge)
-                                Text(if (filter == TaskFilter.COMPLETED) "Отмечайте сделанное — и наблюдайте за прогрессом." else "Добавьте первую задачу и выберите удобное время.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                            LifetyEmptyState(
+                                title = if (filter == TaskFilter.COMPLETED) "Прогресс начинается с малого" else "Пока здесь пусто",
+                                message = if (filter == TaskFilter.COMPLETED) "Завершённые задачи появятся здесь. Lifety рядом, шаг за шагом." else "Добавь первую задачу, и Lifety поможет держать день в одном контексте.",
+                                emotion = if (filter == TaskFilter.COMPLETED) LifetyEmotion.Calm else LifetyEmotion.Happy,
+                                actionLabel = if (filter == TaskFilter.COMPLETED) null else "Добавить задачу",
+                                onAction = if (filter == TaskFilter.COMPLETED) null else ({ planner?.createTask() }),
+                            )
                         }
                         items(tasks, key = { it.id }) { task ->
                             TaskCard(task, task.id in state.busyIds, onOpen = { planner?.openTask(task.id) },

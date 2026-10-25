@@ -1,6 +1,9 @@
 package ru.lifety.feature.tasks
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -19,6 +22,10 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -34,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,6 +57,8 @@ import ru.lifety.core.time.changeTime
 import ru.lifety.core.time.datePickerMillis
 import ru.lifety.core.time.formatDateTime
 import ru.lifety.core.time.isLocalTimePreserved
+import ru.lifety.core.ui.LifetyIcon
+import ru.lifety.core.ui.LifetySymbol
 import ru.lifety.core.ui.LocalRepositories
 import ru.lifety.core.ui.PlaceholderScreen
 import kotlin.time.Clock
@@ -63,17 +73,23 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
     val state by model.state.collectAsState()
     var confirmDelete by remember { mutableStateOf(false) }
     LaunchedEffect(model) { model.finished.collect { onClose() } }
-    Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0),
+    val saving by rememberUpdatedState(state.saving)
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { it != SheetValue.Hidden || !saving })
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val sheetHeight = maxHeight * 0.92f
+        ModalBottomSheet(onDismissRequest = { if (!state.saving) onClose() }, sheetState = sheet,
+            containerColor = MaterialTheme.colorScheme.background) {
+    Scaffold(modifier = Modifier.fillMaxWidth().height(sheetHeight), contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(title = { Text(if (taskId == null) "Новая задача" else "Редактирование", style = MaterialTheme.typography.titleLarge) },
-                navigationIcon = { TextButton(onClick = onClose, enabled = !state.saving) { Text("‹ Назад") } },
+                navigationIcon = { IconButton(onClick = onClose, enabled = !state.saving, modifier = Modifier.semantics { contentDescription = "Закрыть редактор" }) { LifetyIcon(LifetySymbol.Close) } },
                 windowInsets = WindowInsets(0, 0, 0, 0),
                 actions = { if (taskId != null && state.task != null) TextButton(onClick = { confirmDelete = true }, enabled = !state.saving) { Text("Удалить", color = MaterialTheme.colorScheme.error) } })
         },
         bottomBar = {
             if (state.task != null) Surface(tonalElevation = 2.dp) {
-                Button(onClick = model::save, enabled = !state.saving, modifier = Modifier.fillMaxWidth().imePadding().padding(16.dp)) {
-                    if (state.saving) CircularProgressIndicator(modifier = Modifier.padding(end = 12.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                Button(onClick = model::save, enabled = !state.saving, modifier = Modifier.fillMaxWidth().imePadding().padding(16.dp).height(52.dp)) {
+                    if (state.saving) CircularProgressIndicator(modifier = Modifier.padding(end = 12.dp).size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                     Text(if (state.saving) "Сохраняем…" else if (taskId == null) "Создать задачу" else "Сохранить изменения")
                 }
             }
@@ -105,6 +121,8 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
                 }
             }
+        }
+    }
         }
     }
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Удалить задачу?") },

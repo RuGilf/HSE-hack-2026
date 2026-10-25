@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import ru.lifety.core.repository.Repositories
+import ru.lifety.core.ui.LifetyTheme
 
 @Composable
 fun RepositoryBootstrap(load: suspend () -> Repositories, content: @Composable (Repositories) -> Unit) {
@@ -33,7 +35,9 @@ fun RepositoryBootstrap(load: suspend () -> Repositories, content: @Composable (
     }
     val ready = repositories
     if (ready != null) content(ready)
-    else MaterialTheme {
+    else LifetyTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground) {
         Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
             if (failed) {
                 Text("Не удалось открыть локальное хранилище")
@@ -42,6 +46,7 @@ fun RepositoryBootstrap(load: suspend () -> Repositories, content: @Composable (
                 CircularProgressIndicator()
                 Text("Открываем ваш план…")
             }
+        }
         }
     }
 }

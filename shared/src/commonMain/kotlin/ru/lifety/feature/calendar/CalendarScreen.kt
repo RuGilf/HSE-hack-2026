@@ -13,7 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -50,6 +50,10 @@ import ru.lifety.core.time.monthGrid
 import ru.lifety.core.time.russianMonths
 import ru.lifety.core.time.tasksOnDate
 import ru.lifety.core.time.today
+import ru.lifety.core.ui.LifetyEmptyState
+import ru.lifety.core.ui.LifetyEmotion
+import ru.lifety.core.ui.LifetyIcon
+import ru.lifety.core.ui.LifetySymbol
 import ru.lifety.core.ui.LocalRepositories
 import ru.lifety.core.ui.PlaceholderScreen
 import ru.lifety.core.ui.TaskCard
@@ -75,13 +79,12 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.actionError) { state.actionError?.let { snackbar.showSnackbar(it); model.dismissError() } }
     Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0), snackbarHost = { SnackbarHost(snackbar) },
-        floatingActionButton = { ExtendedFloatingActionButton(onClick = { planner?.createTask(selected.atTime(9, 0).toInstant(zone).toEpochMilliseconds()) }) { Text("+  Задача на этот день") } }) { padding ->
+        floatingActionButton = { FloatingActionButton(onClick = { planner?.createTask(selected.atTime(9, 0).toInstant(zone).toEpochMilliseconds()) },
+            shape = androidx.compose.foundation.shape.CircleShape, containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.semantics { contentDescription = "Добавить задачу на выбранный день" }) { LifetyIcon(LifetySymbol.Plus) } }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 100.dp)) {
-            item {
-                Text("ВРЕМЯ ДЛЯ ВАЖНОГО", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                Text("Календарь", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 8.dp))
-            }
             item {
                 Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -105,7 +108,7 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                             Text(day.day.toString(), style = MaterialTheme.typography.bodyMedium,
                                                 color = if (chosen) MaterialTheme.colorScheme.onPrimary else if (day.month.number == month.month.number) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
-                                            Text(if ((taskCounts[day] ?: 0) > 0) "•" else " ", style = MaterialTheme.typography.labelSmall)
+                                            Text(if ((taskCounts[day] ?: 0) > 0) "•" else " ", style = MaterialTheme.typography.labelSmall, color = if (chosen) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary)
                                         }
                                     }
                                 }
@@ -125,7 +128,7 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                     Text(requireNotNull(state.readError), color = MaterialTheme.colorScheme.error)
                     Button(onClick = model::retry) { Text("Повторить") }
                 }
-                selectedTasks.isEmpty() -> item { Text("На этот день задач нет. Оставьте время для себя или добавьте новый план.", modifier = Modifier.padding(vertical = 16.dp)) }
+                selectedTasks.isEmpty() -> item { LifetyEmptyState("Свободный день", "Оставь время для себя или добавь новый план.", emotion = LifetyEmotion.Calm, mascotSize = 72.dp) }
                 else -> items(selectedTasks, key = { it.id }) { task ->
                     TaskCard(task, task.id in state.busyIds, onOpen = { planner?.openTask(task.id) }, onToggle = { model.toggle(task) })
                 }
