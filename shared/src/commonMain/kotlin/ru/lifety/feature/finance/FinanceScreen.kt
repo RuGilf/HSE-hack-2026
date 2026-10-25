@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -56,7 +57,11 @@ fun FinanceContent(
     var deleting by remember { mutableStateOf<Expense?>(null) }
     var showBudget by remember { mutableStateOf(false) }
     // shortcut: session-only configuration; durable budgets need a Core preferences contract.
-    var budgets by remember { mutableStateOf(emptyMap<String, Long>()) }
+    val budgetMonth = today.toString().take(7)
+    var budgets by rememberSaveable(budgetMonth, stateSaver = mapSaver<Map<String, Long>>(
+        save = { mapOf<String, Any?>("month" to budgetMonth) + it },
+        restore = { saved -> restoreMonthlyBudgets(saved, budgetMonth) },
+    )) { mutableStateOf(emptyMap<String, Long>()) }
     val pending by FinanceNotifications.inbox.pending.collectAsState()
     val importResult by FinanceNotifications.intake.lastResult.collectAsState()
     val savedIds = state.expenses.map { it.id }.toSet()
@@ -152,28 +157,17 @@ fun FinanceContent(
                         Text("Расходы за период · $currency", style = MaterialTheme.typography.labelLarge)
                         Text(formatMoney(summary.totalMinor, currency), style = MaterialTheme.typography.headlineLarge)
                         Text("${summary.expenses.size} операций · валюты считаются отдельно")
-                        budgets[currency]?.let { budget ->
-                            val remaining = remainingBudget(budget, summary.totalMinor)
-                            Text("Бюджет: ${formatMoney(budget, currency)}")
-                            Text((if (remaining < 0) "Превышение: " else "Остаток: ") +
-                                formatMoney(if (remaining < 0) -remaining else remaining, currency),
-                                color = if (remaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-                        }
-                        TextButton(onClick = { showBudget = true }) { Text("Бюджет на период (в этой сессии)") }
+
                     }
                 }
             }
-            if (summary.byCategory.isNotEmpty()) item {
-                Text("По категориям", style = MaterialTheme.typography.titleMedium)
-                summary.byCategory.entries.sortedByDescending { it.value }.forEach { (category, amount) ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(categoryTitle(category), Modifier.weight(1f))
-                        Text(formatMoney(amount, currency))
-                    }
-                }
-            }
+            if (summary.byCategory.isNotEmpty()) item { CategoryChart(summary, currency) }
         }
         item {
+            if (storageConnected && !state.loading) {
+                MonthlyBudgetCard(budgetMonth, currency, quickTotals[FinancePeriod.MONTH], budgets[currency],
+                    onEdit = { showBudget = true })
+            }
             HorizontalDivider()
             Text("Из уведомлений", style = MaterialTheme.typography.titleMedium)
             Text("Только покупки. Перед записью проверьте сумму, магазин и дату.", style = MaterialTheme.typography.bodySmall)

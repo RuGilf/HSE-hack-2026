@@ -61,3 +61,20 @@ val financeCategories = linkedMapOf(
 )
 
 fun categoryTitle(category: String): String = financeCategories[category] ?: category
+
+/** Drawing ratio only. All amounts, totals and balances stay in Long minor units. */
+fun expenseShare(part: Long, total: Long): Float {
+    require(part >= 0 && total >= 0)
+    if (total == 0L) return 0f
+    return (part.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+}
+
+fun inferFinanceCategory(merchant: String): String {
+    val name = merchant.lowercase()
+    return when {
+        listOf("taxi", "такси", "transport", "транспорт", "metro ticket").any { it in name } -> "transport"
+        listOf("pyater", "пятёр", "пятер", "magnit", "магнит", "coffee", "кофе", "cafe", "кафе", "metro", "перекрест").any { it in name } -> "food"
+        listOf("аптек", "pharma", "clinic", "клиник").any { it in name } -> "health"
+        else -> "other"
+    }
+}
