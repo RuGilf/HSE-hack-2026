@@ -1,0 +1,20 @@
+# Lifety: parallel work contract
+
+Read `docs/CONTRACTS.md` and `README.md` before editing. This baseline contains
+infrastructure and placeholders only. Implement features only when a subsequent
+user task authorizes them.
+
+- Codex 1 owns core, database, tasks, calendar, root navigation, all Gradle files,
+  Android entry point, resources and Manifest, documentation and shared tests.
+- Codex 2 owns finance and Android notifications.
+- Codex 3 owns assistant, dashboard, health and AI integrations.
+
+Keep public models, repository interfaces, screen entry signatures and route IDs
+stable. Request shared changes through Codex 1. Feature code uses repository
+interfaces; SQLDelight and SQL stay in database. Do not add another database
+framework, server, cloud database, registration or vector search.
+
+Use separate branches/worktrees for parallel agents. Do not commit generated
+files, `local.properties`, credentials or build output. Before handing off, run
+the Android build and shared host tests specified in the README. Only claim
+checks that actually ran. Document missing device/iOS checks.

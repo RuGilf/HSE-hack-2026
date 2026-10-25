@@ -1,0 +1,27 @@
+import kotlin.Boolean;
+import kotlin.Int;
+
+-- Schema only. Repository queries and implementations belong to Codex 1.
+CREATE TABLE task (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    scheduledAt INTEGER,
+    deadlineAt INTEGER,
+    isCompleted INTEGER AS Boolean NOT NULL
+);
+
+CREATE TABLE expense (
+    id TEXT NOT NULL PRIMARY KEY,
+    amountMinor INTEGER NOT NULL,
+    currency TEXT NOT NULL,
+    merchant TEXT NOT NULL,
+    category TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    source TEXT NOT NULL
+);
+
+CREATE TABLE healthSnapshot (
+    timestamp INTEGER NOT NULL PRIMARY KEY,
+    sleepMinutes INTEGER AS Int,
+    steps INTEGER AS Int
+);
