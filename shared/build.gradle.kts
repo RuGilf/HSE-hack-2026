@@ -39,6 +39,8 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
         }
         androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.health.connect)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.sqldelight.android)
             implementation(libs.ktor.client.okhttp)
