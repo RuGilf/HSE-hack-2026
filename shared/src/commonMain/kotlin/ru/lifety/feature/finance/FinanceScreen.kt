@@ -1,5 +1,6 @@
 package ru.lifety.feature.finance
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,7 +46,7 @@ fun FinanceContent(
     val today = localFinanceDate(financeNow())
     var currency by rememberSaveable { mutableStateOf("RUB") }
     var fromText by rememberSaveable { mutableStateOf(today.copy(day = 1).toString()) }
-    var toText by rememberSaveable { mutableStateOf(today.toString()) }
+    var toText by rememberSaveable { mutableStateOf(today.firstDayOfNextMonth().previousDay().toString()) }
     var allTime by rememberSaveable { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Expense?>(null) }
     var suggestionId by remember { mutableStateOf<String?>(null) }
@@ -60,18 +61,26 @@ fun FinanceContent(
     val from = FinanceDate.parse(fromText)
     val to = FinanceDate.parse(toText)
     val periodValid = allTime || (from != null && to != null && from <= to)
-    val result = remember(state.expenses, currency, from, to, allTime) {
+    val bounds = remember(from, to, allTime) {
         runCatching {
             require(periodValid)
-            summarizeExpenses(state.expenses, currency,
-                if (allTime) Long.MIN_VALUE else financeDayStart(requireNotNull(from)),
-                if (allTime) Long.MAX_VALUE else financeDayStart(requireNotNull(to).nextDay()))
+            (if (allTime) Long.MIN_VALUE else financeDayStart(requireNotNull(from))) to
+                (if (allTime) Long.MAX_VALUE else financeDayStart(requireNotNull(to).nextDay()))
+        }.getOrNull()
+    }
+    val summary = remember(state.expenses, currency, bounds) {
+        bounds?.let { (start, end) -> runCatching { summarizeExpenses(state.expenses, currency, start, end) }.getOrNull() }
+    }
+    val quickTotals = remember(state.expenses, currency, today) {
+        FinancePeriod.entries.associateWith { period ->
+            val range = financePeriodDates(period, today)
+            runCatching { summarizeExpenses(state.expenses, currency,
+                financeDayStart(range.from), financeDayStart(range.until)).totalMinor }.getOrNull()
         }
     }
-    val summary = result.getOrNull()
 
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -83,7 +92,7 @@ fun FinanceContent(
             }
         }
         if (!storageConnected) item {
-            Notice("Хранилище не подключено. Codex 1 должен передать Repositories в LifetyApp. Расходы пока нельзя сохранять.")
+            Notice("Локальное хранилище пока недоступно. Сохранение расходов станет доступно после подключения.")
         }
         if (state.error != null) item {
             Notice(state.error)
@@ -92,14 +101,13 @@ fun FinanceContent(
         if (state.loading || state.saving) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !allTime && fromText == today.copy(day = 1).toString(),
-                    onClick = { allTime = false; fromText = today.copy(day = 1).toString(); toText = today.toString() },
-                    label = { Text("Этот месяц") })
-                FilterChip(selected = false, onClick = {
-                    var start = today
-                    repeat(6) { start = start.previousDay() }
-                    allTime = false; fromText = start.toString(); toText = today.toString()
-                }, label = { Text("7 дней") })
+                FinancePeriod.entries.forEach { period ->
+                    val range = financePeriodDates(period, today)
+                    val end = range.until.previousDay().toString()
+                    FilterChip(selected = !allTime && fromText == range.from.toString() && toText == end,
+                        onClick = { allTime = false; fromText = range.from.toString(); toText = end },
+                        label = { Text(period.title) })
+                }
                 FilterChip(selected = allTime, onClick = { allTime = true }, label = { Text("Всё время") })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -110,10 +118,25 @@ fun FinanceContent(
                     label = { Text("По (включительно)") }, singleLine = true,
                     isError = !allTime && to == null, modifier = Modifier.weight(1f))
             }
-            Text("Даты в часовом поясе устройства", style = MaterialTheme.typography.bodySmall)
+            Text("Даты в часовом поясе устройства · неделя — последние 7 дней", style = MaterialTheme.typography.bodySmall)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (listOf("RUB", "USD", "EUR") + state.expenses.map { it.currency }).distinct().forEach { code ->
                     FilterChip(selected = currency == code, onClick = { currency = code }, label = { Text(code) })
+                }
+            }
+        }
+        if (storageConnected && !state.loading) item {
+            Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FinancePeriod.entries.forEach { period ->
+                        Column(Modifier.weight(1f)) {
+                            Text(period.title, style = MaterialTheme.typography.labelMedium)
+                            val amount = quickTotals[period]
+                            Text(amount?.let { formatMoney(it, currency) } ?: "Ошибка суммы",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (amount == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
                 }
             }
         }
@@ -175,13 +198,14 @@ fun FinanceContent(
         }
         item { Text("Транзакции", style = MaterialTheme.typography.titleLarge) }
         // Keep individual entries accessible even if a corrupt total cannot be calculated.
-        val visible = summary?.expenses ?: state.expenses.filter { it.currency == currency }
-            .sortedWith(compareByDescending<Expense> { it.timestamp }.thenBy { it.id })
-        if (visible.isEmpty() && !state.loading) item { Text("За этот период расходов нет. Добавьте первый расход.") }
+        val visible = summary?.expenses ?: bounds?.let { (start, end) ->
+            selectExpenses(state.expenses, currency, start, end)
+        }.orEmpty()
+        if (visible.isEmpty() && !state.loading && periodValid && storageConnected) item { Text("За этот период расходов нет. Добавьте первый расход.") }
         visible.groupBy { localFinanceDate(it.timestamp) }.forEach { (date, expenses) ->
             item(key = "date:$date") { Text(date.toString(), style = MaterialTheme.typography.titleSmall) }
             items(expenses, key = { "expense:${it.id}" }) { expense ->
-                ExpenseRow(expense, enabled = !state.saving, onEdit = {
+                ExpenseRow(expense, enabled = storageConnected && !state.saving, onEdit = {
                     editing = expense; suggestionId = null; showEditor = true
                 }, onDelete = { deleting = expense })
             }

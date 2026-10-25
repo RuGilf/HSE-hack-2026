@@ -32,9 +32,7 @@ data class ExpenseSummary(
 
 /** Half-open UTC timestamps, derived by the UI from inclusive local calendar dates. */
 fun summarizeExpenses(expenses: List<Expense>, currency: String, from: Long, until: Long): ExpenseSummary {
-    require(from <= until)
-    val selected = expenses.filter { it.currency == currency && it.timestamp >= from && it.timestamp < until }
-        .sortedWith(compareByDescending<Expense> { it.timestamp }.thenBy { it.id })
+    val selected = selectExpenses(expenses, currency, from, until)
     var total = 0L
     val categories = mutableMapOf<String, Long>()
     selected.forEach {
@@ -46,6 +44,11 @@ fun summarizeExpenses(expenses: List<Expense>, currency: String, from: Long, unt
     return ExpenseSummary(selected, total, categories)
 }
 
+fun selectExpenses(expenses: List<Expense>, currency: String, from: Long, until: Long): List<Expense> {
+    require(from <= until)
+    return expenses.filter { it.currency == currency && it.timestamp >= from && it.timestamp < until }
+        .sortedWith(compareByDescending<Expense> { it.timestamp }.thenBy { it.id })
+}
 fun remainingBudget(budget: Long, spent: Long): Long {
     require(budget >= 0 && spent >= 0)
     return budget - spent

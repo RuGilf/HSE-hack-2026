@@ -87,3 +87,21 @@ Commit target: `feature/finance` only; never merge into main.
 Validation is reported with actual commands/results in the final handoff. No physical device or
 emulator is attached; Android UI, a real bank notification and iOS compilation/runtime are not
 verified on this Windows host. SDK 37 was installed with user-approved license acceptance.
+
+## Follow-up delivery (2026-10-25)
+
+The existing baseline feature commit is retained; history is not rewritten.
+
+1. P0: explicit day / rolling-seven-day / full-calendar-month totals and selection;
+   no out-of-period fallback when a total overflows; external Flow update regression.
+2. P1: selected-bank intake with visible hidden/unrecognized outcomes, confirmation replay
+   that preserves an already saved/edited expense, and consent/dedup/demo tests.
+3. P2: current-calendar-month budget/progress and category bar chart, using inherited
+   MaterialTheme tokens. Budget remains session-only because no Core budget contract exists.
+
+Shared-theme integration for Codex 1: the checked-out foundation still has a bare
+`MaterialTheme {}` in LifetyApp and no shared color palette. Provide Lifety's near-black
+background, dark surfaces, bright-green primary, white text and rounded shapes there.
+Finance intentionally consumes `MaterialTheme.colorScheme` / `MaterialTheme.shapes`;
+it does not override the application's theme. The shared theme is required to display
+all screens consistently in the agreed dark concept.
