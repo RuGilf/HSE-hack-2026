@@ -68,7 +68,6 @@ class OpenAiCompatibleModel(private val settings: ProviderSettings, private val 
     override suspend fun complete(request: ModelRequest): ModelReply = try {
         val payload = buildJsonObject {
             put("model", settings.model); put("stream", false); put("messages", requestMessages(request))
-            put("max_tokens", request.maxOutputTokens)
             if (request.tools.isNotEmpty()) { put("tools", requestTools(request)); put("tool_choice", "auto") }
         }
         client.preparePost(settings.baseUrl.trimEnd('/') + "/chat/completions") {

@@ -166,7 +166,7 @@ class AgentRunner(
     private fun checkSize(request: ModelRequest) {
         val bound = inputTokenBound(request)
         mutableState.value = state.value.copy(inputBound = bound)
-        if (bound + request.maxOutputTokens + 1024 > limits.contextTokens || bound > limits.maxContextChars)
+        if (bound + request.outputReserveTokens + 1024 > limits.contextTokens)
             throw AgentFault("context_limit", "Контекст достиг безопасного лимита. Сохранённые файлы доступны; сузьте запрос или начните новый чат.")
     }
 
@@ -189,7 +189,7 @@ class AgentRunner(
         val active = document.messages.drop(document.summaryThrough)
         val weight = active.sumOf { it.text.encodeToByteArray().size + it.calls.sumOf { call -> call.arguments.encodeToByteArray().size } }
         val bound = inputTokenBound(ModelRequest(SYSTEM, document.summary, active, tools.entries))
-        if ((weight < limits.compactAfterChars && bound < (limits.contextTokens * 0.7).toInt()) || state.value.modelCalls >= limits.maxModelCalls - 1) return
+        if ((weight < limits.compactAfterInputBytes && bound < (limits.contextTokens * 0.7).toInt()) || state.value.modelCalls >= limits.maxModelCalls - 1) return
         val boundary = (document.messages.size - 6).coerceAtLeast(0)
         val cut = (document.summaryThrough + 1..boundary).lastOrNull { document.messages[it].role != "tool" } ?: return
         if (cut <= document.summaryThrough) return

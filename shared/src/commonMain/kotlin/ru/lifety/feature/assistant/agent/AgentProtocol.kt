@@ -25,13 +25,13 @@ val agentJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 enum class RunPhase { LOADING, IDLE, RUNNING, LIMIT, ERROR, CANCELLED }
 data class AgentViewState(val document: AgentDocument = AgentDocument(), val phase: RunPhase = RunPhase.LOADING,
     val error: String? = null, val modelCalls: Int = 0, val promptTokens: Int? = null, val inputBound: Int = 0)
-data class AgentLimits(val maxModelCalls: Int = 8, val maxToolCalls: Int = 24,
-    val maxContextChars: Int = 48000, val compactAfterChars: Int = 12000,
+data class AgentLimits(val maxModelCalls: Int = 16, val maxToolCalls: Int = 48,
+    val compactAfterInputBytes: Int = 12000,
     val maxToolResultChars: Int = 8000, val maxRunMillis: Long = 180000, val contextTokens: Int = 32768)
 data class ModelReply(val text: String = "", val calls: List<ToolCall> = emptyList(), val truncated: Boolean = false,
     val promptTokens: Int? = null)
 data class ModelRequest(val system: String, val context: String, val messages: List<AgentMessage>,
-    val tools: List<AgentTool>, val maxOutputTokens: Int = 2048, val purpose: String = "answer")
+    val tools: List<AgentTool>, val outputReserveTokens: Int = 2048, val purpose: String = "answer")
 fun interface AgentModel { suspend fun complete(request: ModelRequest): ModelReply }
 interface AgentStore { suspend fun read(): AgentDocument?; suspend fun write(document: AgentDocument) }
 class AgentFault(val code: String, message: String) : Exception(message)

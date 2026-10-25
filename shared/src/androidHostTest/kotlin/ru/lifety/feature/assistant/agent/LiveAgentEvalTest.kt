@@ -7,6 +7,42 @@ import kotlin.test.*
 
 /** Opt-in outcome eval. Credentials exist only in the test process environment. */
 class LiveAgentEvalTest {
+    @Test fun realModelRemembersAndCorrectsAPreferenceAcrossSessions() = runBlocking {
+        val key = System.getenv("LIFETY_LLM_API_KEY")
+        val endpoint = System.getenv("LIFETY_LLM_BASE_URL")
+        val model = System.getenv("LIFETY_LLM_MODEL")
+        org.junit.Assume.assumeTrue("Set LIFETY_LLM_* to enable live eval", !key.isNullOrBlank() && !endpoint.isNullOrBlank() && !model.isNullOrBlank())
+        val root = Files.createTempDirectory("lifety-agent-live-memory").toFile()
+        val transport = OpenAiCompatibleModel(ProviderSettings(endpoint!!, model!!), key!!)
+        try {
+            val workspace = AgentWorkspace(LocalAgentDisk(root.resolve("workspace").path))
+            val store = JsonAgentStore(LocalAgentDisk(root.resolve("private").path))
+            val env = LifetyAgentEnvironment(null, workspace, { 1000 })
+            val first = AgentRunner(transport, store, env.registry, env::snapshot, { 1000 })
+            first.initialize()
+            first.send("Я предпочитаю чай. Запомни это как моё предпочтение для будущих разговоров.", AgentScopes(memory = true))
+            assertEquals(RunPhase.IDLE, first.state.value.phase)
+            val initial = first.state.value.document.proposals.last { it.kind == "memory_set" && it.status == "pending" }
+            assertTrue(first.state.value.document.facts.isEmpty())
+            first.approve(initial.id)
+            assertEquals(1, first.state.value.document.facts.size)
+            first.newChat()
+            val reopened = AgentRunner(transport, store, env.registry, env::snapshot, { 2000 })
+            reopened.initialize()
+            reopened.send("Какой напиток я предпочитаю?", AgentScopes(memory = true))
+            assertEquals(RunPhase.IDLE, reopened.state.value.phase)
+            val answer = reopened.state.value.document.messages.last { it.role == "assistant" }.text.lowercase()
+            assertTrue(listOf("чай", "чая", "tea").any { it in answer })
+            reopened.send("Теперь я предпочитаю кофе. Исправь именно существующее предпочтение напитка, сохранив его ключ и домен.", AgentScopes(memory = true))
+            assertEquals(RunPhase.IDLE, reopened.state.value.phase)
+            val correction = reopened.state.value.document.proposals.last { it.kind == "memory_set" && it.status == "pending" }
+            reopened.approve(correction.id)
+            val fact = reopened.state.value.document.facts.single()
+            assertTrue(listOf("кофе", "coffee").any { it in fact.value.lowercase() })
+            println("LIVE_MEMORY recall=passed correction=passed facts=${reopened.state.value.document.facts.size}")
+        } finally { transport.close(); root.deleteRecursively() }
+    }
+
     @Test fun realModelWritesAndExecutesAnExactMoneyReport() = runBlocking {
         val key = System.getenv("LIFETY_LLM_API_KEY")
         val endpoint = System.getenv("LIFETY_LLM_BASE_URL")
@@ -19,12 +55,12 @@ class LiveAgentEvalTest {
             val env = LifetyAgentEnvironment(testRepositories(), workspace, { 1000 })
             val observed = AgentModel { request ->
                 // Synthetic fixture only; never persist real app requests in production logs.
-                java.io.File("build/agent-live-last-request.json").apply { parentFile.mkdirs() }.writeText(buildJsonObject {
-                    put("model", model); put("messages", requestMessages(request)); put("tools", requestTools(request)); put("max_tokens", request.maxOutputTokens)
+                java.io.File("build/agent-live-last-request.json").apply { requireNotNull(parentFile).mkdirs() }.writeText(buildJsonObject {
+                    put("model", model); put("messages", requestMessages(request)); put("tools", requestTools(request))
                 }.toString())
                 transport.complete(request)
             }
-            val runner = AgentRunner(observed, MemoryAgentStore(), env.registry, env::snapshot, { 1000 }, AgentLimits(maxModelCalls = 12, maxRunMillis = 240000))
+            val runner = AgentRunner(observed, MemoryAgentStore(), env.registry, env::snapshot, { 1000 })
             runner.initialize()
             runner.send("Это изолированный тест на искусственных данных. Найди все доступные расходы и посчитай точную сумму по каждой валюте. " +
                 "Сам создай JavaScript-файл в scripts/ и выполни его через script_run. Сохрани результат в reports/live-totals.json " +

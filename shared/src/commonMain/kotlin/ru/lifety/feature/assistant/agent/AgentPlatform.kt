@@ -13,7 +13,7 @@ interface AgentVault {
 class AgentRuntime internal constructor(val workspace: AgentWorkspace, private val store: AgentStore, val vault: AgentVault,
     private val now: () -> Long, private val gate: Mutex, private val sessionLease: Mutex = Mutex()) {
     /** No HTTP call is made until start(). Caller owns the returned session and must close it. */
-    suspend fun open(repositories: Repositories? = null, credentials: AgentCredentials? = null): AgentSession {
+    suspend fun open(repositories: Repositories? = null, credentials: AgentCredentials? = null, runLimits: AgentLimits = AgentLimits()): AgentSession {
         if (!sessionLease.tryLock()) throw AgentFault("busy", "Для этой рабочей папки уже открыта сессия агента")
         var model: OpenAiCompatibleModel? = null
         try {
@@ -21,7 +21,7 @@ class AgentRuntime internal constructor(val workspace: AgentWorkspace, private v
             model = OpenAiCompatibleModel(configured.settings, configured.key)
             val environment = LifetyAgentEnvironment(repositories, workspace, now)
             val runner = AgentRunner(model, store, environment.registry, environment::snapshot, now,
-                AgentLimits(contextTokens = configured.settings.contextTokens), gate)
+                runLimits.copy(contextTokens = configured.settings.contextTokens), gate)
             runner.initialize()
             return AgentSession(runner, workspace, model) { sessionLease.unlock() }
         } catch (failure: Exception) { model?.close(); sessionLease.unlock(); throw failure }

@@ -78,9 +78,9 @@ units; JavaScript calculations use BigInt, with separate totals per currency.
 - `files_delete(path, expectedRevision)`: delete one writable artifact.
 - `script_run(path)`: execute a saved JavaScript source file and return the run
   status plus bounded stdout/stderr and paths to larger output files.
-- `source_refresh(source)`: regenerate an allowed source snapshot through its
+- `source_refresh()`: regenerate the allowed source snapshots through their
   adapter; return the updated manifest, never a pretend successful sync.
-- `action_propose(kind, arguments)`: request an app change or confirmed memory
+- `app_propose(kind, payload)`: request an app change or confirmed memory
   update. Runtime schemas and UI approval govern the available action kinds.
 
 Script bindings expose the same bounded workspace operations, not Java
@@ -93,8 +93,8 @@ Each tool checks permissions and path ownership itself. Reject absolute paths,
 traversal, symlinks and paths resolving outside the root. Start with a 20 MiB
 workspace quota, 1 MiB per text file and 64 KiB per tool read. Paginate source
 exports rather than silently dropping records. Quota or storage failure is a
-visible error. Scratch data has an explicit retention policy; durable memory
-and user reports are not silently removed to recover space.
+visible error. Cleanup is explicit through file deletion or an integrator-owned
+workspace reset; durable memory/reports are not silently removed to recover space.
 
 ## Execution and context
 

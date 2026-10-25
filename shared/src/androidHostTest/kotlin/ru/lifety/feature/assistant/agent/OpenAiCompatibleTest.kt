@@ -8,6 +8,39 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class OpenAiCompatibleTest {
+    @Test fun runtimeLeavesGenerationLimitsToTheProvider() = runBlocking {
+        val captured = AtomicReference<JsonObject?>(null)
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/v1/chat/completions") { exchange ->
+            val payload = agentJson.parseToJsonElement(exchange.requestBody.bufferedReader().readText()).jsonObject
+            captured.set(payload)
+            val response = """{"choices":[{"finish_reason":"stop","message":{"content":"hello"}}]}""".toByteArray()
+            exchange.sendResponseHeaders(200, response.size.toLong()); exchange.responseBody.use { it.write(response) }
+        }
+        server.start()
+        val root = java.nio.file.Files.createTempDirectory("lifety-budget").toFile()
+        try {
+            val settings = ProviderSettings("http://127.0.0.1:${server.address.port}/v1", "test-model")
+            val credentials = AgentCredentials(settings, "test-key")
+            val vault = object : AgentVault {
+                override val description = "test"
+                override suspend fun load() = credentials
+                override suspend fun save(credentials: AgentCredentials) = Unit
+            }
+            val runtime = AgentRuntime(AgentWorkspace(LocalAgentDisk(root.resolve("workspace").path)),
+                JsonAgentStore(LocalAgentDisk(root.resolve("private").path)), vault, { 1 }, kotlinx.coroutines.sync.Mutex())
+            val session = runtime.open()
+            try {
+                session.start("hello").join()
+                assertEquals(RunPhase.IDLE, session.runner.state.value.phase)
+                val payload = assertNotNull(captured.get())
+                assertFalse("max_tokens" in payload)
+                assertFalse("max_completion_tokens" in payload)
+            }
+            finally { session.close() }
+        } finally { server.stop(0); root.deleteRecursively() }
+    }
+
     @Test fun roundTripsFunctionCallsWithRealHttpAndDoesNotFollowCredentialRedirects() = runBlocking {
         val captured = AtomicReference("")
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)

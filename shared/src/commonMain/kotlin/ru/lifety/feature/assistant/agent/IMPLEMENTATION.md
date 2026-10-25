@@ -9,24 +9,24 @@ See ENVIRONMENT_DESIGN.md. User approved QuickJS and the exact shared Gradle dep
 patch. Later steering explicitly excludes UI: provide a Kotlin API and INTEGRATION.md.
 No screen, root navigation, schema, model/repository contract or Manifest changes.
 
-- [ ] Kernel: provider-neutral messages/tool contracts; bounded model-tool loop, cancellation,
+- [x] Kernel: provider-neutral messages/tool contracts; bounded model-tool loop, cancellation,
   checkpoint-before-action, interrupted-call recovery, permissions enforced outside the model.
-- [ ] Workspace: bounded list/read/search/write/delete; private paths, quotas, atomic writes;
+- [x] Workspace: bounded list/read/search/write/delete; private paths, quotas, atomic writes;
   separate immutable source/skill files from editable notes/scripts/reports.
-- [ ] Runtime: verify QuickJS artifacts and actual timeout/BigInt/memory behavior; a fresh
+- [x] Runtime: verify QuickJS artifacts and actual timeout/BigInt/memory behavior; a fresh
   restricted interpreter per script; no network/OS bindings; exact Gradle patch for Codex 1.
-- [ ] Data: pluggable snapshot sources over existing repositories; exact minor-unit money,
+- [x] Data: repository-backed snapshot sources; exact minor-unit money,
   freshness/coverage metadata; no raw bank notification text, no fictional health history.
-- [ ] Memory/actions: sourced facts, proposal/approval, idempotent task updates with conflict checks;
+- [x] Memory/actions: sourced facts, proposal/approval, idempotent task updates with conflict checks;
   file-backed private session/memory checkpoints (not a duplicate transaction database).
-- [ ] Context: stable instructions/tool definitions, bounded current snapshot/relevant memory;
+- [x] Context: stable instructions/tool definitions, bounded current snapshot/relevant memory;
   incremental model-generated working summary, retained raw local history and tool receipts.
-- [ ] Transport: configurable HTTPS Chat Completions API + tool calling, no automatic retries of
+- [x] Transport: configurable HTTPS Chat Completions API + tool calling, no automatic retries of
   actions, bounded response, redacted errors, redirects disabled; test against a local HTTP server.
-- [ ] Platform/API: headless Android/iOS factories, session lifecycle, data scopes and proposals,
+- [x] Platform/API: headless Android/iOS factories, session lifecycle, data scopes and proposals,
   memory inspection/deletion, Android atomic file + Keystore credentials, iOS private file and
   in-memory key. UI integration belongs to the other agent. No live credential is available.
-- [ ] Tests/evals: exact calculations, tools/permissions, replay/conflicts, interruption, compaction,
+- [x] Tests/evals: exact calculations, tools/permissions, replay/conflicts, interruption, compaction,
   state persistence failures, API protocol/error behavior, then Android full build + host tests + iOS.
 
 Execution: inline with TDD and one independent final review.
@@ -44,9 +44,20 @@ A later Responses/Anthropic transport can implement the same AgentModel interfac
 - API: real localhost HTTP tool-call round trip, endpoint validation, redirect rejection.
 - Lifecycle: single-session lease and close/reopen checked; factories compile for both targets.
 - Latest combined command: Android full build + host tests + common metadata + iOS simulator
-  source compilation passed. 59 tests, 0 failures, 1 skipped (Windows symlink privilege).
+  source compilation passed on origin/main 2518b8a. 100 tests, 0 failures,
+  1 skipped (Windows symlink privilege), including both enabled live-model evals.
 - Android QuickJS ELF LOAD alignment checked on all four ABI binaries: 16384 bytes.
 - User rulings: QuickJS/shared Gradle patch approved; UI explicitly excluded; push own
   branch and provide INTEGRATION.md. No shared contract/schema/Manifest/nav edits.
-- Pending: independent final review and any required fixes, final verification, commit/push.
-- Live provider/Android device/Keystore runtime/iOS runtime/link not tested: no key/device.
+- Independent final review completed. Four reproduced findings fixed RED -> GREEN:
+  orphan backup erasure, settling failed tool-result writes before a new user turn,
+  input-budget checks on compaction, initialization guards on all document mutations.
+- Repository read/check/write is not atomic CAS; existing-at-approval conflicts are
+  detected, but an interleaving writer requires a future Core conditional-write contract.
+- User explicitly forbids max_tokens. No generation cap is emitted; a real HTTP
+  boundary regression enforces absence. Internal outputReserveTokens is input headroom only.
+- Real Gemini API evals passed: executable exact-money report and memory recall/correction
+  across sessions. API credentials used only from test environment, absent from sources.
+- Android device/Keystore runtime/iOS runtime/link remain untested: no device available.
+- Delivery target: codex/native-agent-harness; connection guide in INTEGRATION.md.
+  Main merge and UI integration belong to the receiving agent.
