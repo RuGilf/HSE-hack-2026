@@ -1,141 +1,99 @@
 package ru.lifety.feature.assistant
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import ru.lifety.core.ui.*
-import ru.lifety.feature.assistant.ai.*
+import ru.lifety.feature.assistant.agent.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssistantScreen(modifier: Modifier = Modifier) {
+    val runtime = rememberAgentRuntime()
     val repositories = LocalRepositories.current
-    key(repositories) {
-        val scope = rememberCoroutineScope()
-        val controller = remember(repositories, scope) { AssistantController(repositories, scope) }
-        val state by controller.state.collectAsState()
-        Column(modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                LifetyMascot(Modifier.size(40.dp), animated = false)
-                Column {
-                    Text("План дня и разбор расходов", style = MaterialTheme.typography.titleMedium)
-                    Text("Выберите данные перед отправкой", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            if (repositories == null) Text("Хранилище не подключено. Настройки доступны, анализ появится после подключения локальных данных.", color = MaterialTheme.colorScheme.error)
-            AiSettings(state.settings, !state.busy, controller::updateSettings)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AnalysisGoal.entries.forEach { goal ->
-                    FilterChip(selected = state.goal == goal, onClick = { controller.chooseGoal(goal) }, enabled = !state.busy, label = { Text(goal.label) })
-                }
-            }
-            FilledTonalButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = controller::preparePreview, enabled = !state.busy && repositories != null && state.settings.permissions.any) {
-                Text(if (state.preview == null) "Подготовить предпросмотр" else "Обновить предпросмотр")
-            }
-            state.preview?.let { preview ->
-                val json = remember(preview) { preview.previewJson() }
-                Card(modifier = Modifier.animateContentSize(tween(LifetyMotion.Standard)), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Данные перед отправкой", style = MaterialTheme.typography.titleLarge)
-                        Text("Адрес: ${state.settings.endpoint}\nМодель: ${state.settings.model.ifBlank { "не выбрана" }}")
-                        Text("Это зафиксированный снимок. Именно этот JSON будет отправлен с инструкцией «${state.goal.label}». Ключ передаётся отдельно в заголовке авторизации.")
-                        SelectionContainer {
-                            Text(json, modifier = Modifier.fillMaxWidth().heightIn(max = 340.dp).verticalScroll(rememberScrollState()),
-                                fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Text("Расходы: последние 30 дней. Названия задач сокращены до 100 символов, максимум 40 задач. Магазины, источники и внутренние ID не отправляются.", style = MaterialTheme.typography.bodySmall)
-                        Button(onClick = controller::analyze, enabled = !state.busy && settingsAreValid(state.settings)) { Text("Проанализировать") }
-                        if (!settingsAreValid(state.settings)) Text("Для отправки укажите ключ, HTTPS endpoint и модель в настройках.")
-                    }
-                }
-            }
-            if (state.busy) {
-                LinearProgressIndicator(Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.outlineVariant)
-                TextButton(onClick = controller::cancel) { Text("Отменить") }
-            }
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            state.result?.let { result ->
-                Text("Ваш следующий шаг", style = MaterialTheme.typography.headlineSmall)
-                Text(result.summary, style = MaterialTheme.typography.bodyLarge)
-                result.recommendations.forEach { recommendation ->
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(recommendation.title, style = MaterialTheme.typography.titleMedium)
-                            recommendation.taskRef?.let { ref ->
-                                val title = state.preview?.tasks?.items?.firstOrNull { it.ref == ref }?.title.orEmpty()
-                                Text("Задача: $title", style = MaterialTheme.typography.labelLarge)
-                            }
-                            Text(recommendation.explanation)
-                            recommendation.proposedAt?.let { Text("Предложенное время: ${assistantLocalTime(it)}") }
-                        }
-                    }
-                }
-                Text("Рекомендации могут быть неточными. Переносы можно применить самостоятельно в разделе задач. Данные не изменены. Медицинские диагнозы ассистент не ставит.", style = MaterialTheme.typography.bodySmall)
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-    }
-}
-
-@Composable
-private fun AiSettings(settings: AiSettings, enabled: Boolean, onChange: (AiSettings) -> Unit) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val controller = remember(runtime, repositories, scope) { AgentChatController(runtime, repositories, scope) }
+    val state by controller.state.collectAsState()
+    var settings by remember { mutableStateOf(false) }
+    var saved by remember { mutableStateOf(false) }
+    var clearChat by remember { mutableStateOf(false) }
+    var input by rememberSaveable { mutableStateOf("") }
+    val list = rememberLazyListState()
     val focus = LocalFocusManager.current
-    Card(Modifier.fillMaxWidth()) {
-        ListItem(
-            modifier = Modifier.clickable(enabled = enabled) { focus.clearFocus(); expanded = !expanded },
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
-            headlineContent = { Text("Подключение к ИИ") },
-            supportingContent = { Text(if (settingsAreValid(settings)) settings.model else "Нужны API-ключ и модель") },
-            trailingContent = { Text(if (expanded) "Скрыть" else "Настроить", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) },
-        )
-        AnimatedVisibility(expanded, enter = LifetyMotion.RevealEnter, exit = LifetyMotion.RevealExit) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Ключ хранится только в памяти. Запрос отправляется после вашего подтверждения.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedTextField(settings.apiKey.value, { onChange(settings.copy(apiKey = ApiKey(it))) }, modifier = Modifier.fillMaxWidth(),
-                    enabled = enabled, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), label = { Text("API-ключ") })
-                if (settings.apiKey.value.isNotEmpty()) TextButton(onClick = { onChange(settings.copy(apiKey = ApiKey())) }, enabled = enabled) { Text("Удалить ключ из сессии") }
-                OutlinedTextField(settings.endpoint, { onChange(settings.copy(endpoint = it.trim())) }, modifier = Modifier.fillMaxWidth(),
-                    enabled = enabled, singleLine = true, label = { Text("HTTPS endpoint") }, supportingText = { Text("OpenAI-совместимый /v1/chat/completions") })
-                OutlinedTextField(settings.model, { onChange(settings.copy(model = it)) }, modifier = Modifier.fillMaxWidth(),
-                    enabled = enabled, singleLine = true, label = { Text("Модель") })
-            }
+    LaunchedEffect(controller) { controller.initialize().join() }
+    DisposableEffect(controller) { onDispose { controller.close() } }
+    val messages = remember(state.view.document.messages) {
+        state.view.document.messages.filter { (it.role == "user" && !it.text.startsWith("APP_RECEIPT:")) || (it.role == "assistant" && it.text.isNotBlank()) }
+    }
+    val proposals = state.view.document.proposals.filter { it.status != "rejected" }
+    LaunchedEffect(messages.size, proposals.size) {
+        if (messages.isNotEmpty() || proposals.isNotEmpty()) list.animateScrollToItem((messages.size + proposals.size - 1).coerceAtLeast(0))
+    }
+    fun send() { if (controller.send(input.trim()) != null) { input = ""; focus.clearFocus() } }
+    Column(modifier.fillMaxSize().imePadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (state.connected) state.credentials.settings.model else "Подключите свою модель", Modifier.weight(1f),
+                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            TextButton(onClick = { saved = true }, enabled = state.connected && !state.busy) { Text("Сохранённое") }
+            IconButton(onClick = { settings = true }, enabled = !state.busy) { LifetyIcon(LifetySymbol.Settings) }
         }
+        if (messages.isEmpty()) {
+            Column(Modifier.weight(1f).fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                LifetyMascot(Modifier.size(100.dp), emotion = LifetyEmotion.Calm)
+                Spacer(Modifier.height(24.dp))
+                Text("С чего начнём?", style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(8.dp))
+                Text("Разберём расходы, освободим день или вернёмся к тому, что уже обсуждали.", style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(24.dp))
+                if (!state.connected) Button(onClick = { settings = true }, enabled = !state.busy) { Text("Подключить ИИ") }
+                else {
+                    OutlinedButton(onClick = { input = "Разбери мои расходы и предложи, на чём можно сэкономить." }, modifier = Modifier.fillMaxWidth()) { Text("Куда уходят деньги?") }
+                    OutlinedButton(onClick = { input = "Посмотри мои задачи и помоги реалистично спланировать день." }, modifier = Modifier.fillMaxWidth()) { Text("Помоги спланировать день") }
+                }
+            }
+        } else LazyColumn(state = list, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            items(messages, key = { it.id }, contentType = { it.role }) { message ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.role == "user") Arrangement.End else Arrangement.Start) {
+                    if (message.role == "user") Surface(color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp), modifier = Modifier.widthIn(max = 340.dp)) {
+                        SelectionContainer { Text(message.text, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyLarge) }
+                    } else SelectionContainer { Text(message.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.fillMaxWidth()) }
+                }
+            }
+            items(proposals, key = { it.id }, contentType = { "approval" }) { proposal ->
+                AgentProposalCard(proposal, state.busy, { controller.approve(proposal.id) }, { controller.reject(proposal.id) })
+            }
+            item(key = "activity") { AgentActivity(state.view.document.messages, state.busy) }
+        }
+        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+        (state.error ?: state.view.error)?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(input, { input = it.take(8000) }, Modifier.weight(1f), enabled = state.connected,
+                placeholder = { Text("Спросите что-нибудь…") }, maxLines = 5, shape = RoundedCornerShape(24.dp),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if (!state.busy && input.isNotBlank()) send() }))
+            if (state.busy) FilledTonalButton(onClick = controller::cancel, modifier = Modifier.heightIn(min = 56.dp)) { Text("Стоп") }
+            else Button(onClick = ::send, enabled = state.connected && input.isNotBlank(), modifier = Modifier.heightIn(min = 56.dp)) { Text("Отправить") }
+        }
+        if (messages.isNotEmpty()) TextButton(onClick = { clearChat = true }, enabled = !state.busy, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Новый разговор") }
     }
-    Text("Данные для анализа", style = MaterialTheme.typography.titleMedium)
-    Column {
-        PermissionRow("Задачи и сроки", settings.permissions.tasks, enabled) { onChange(settings.copy(permissions = settings.permissions.copy(tasks = it))) }
-        PermissionRow("Сводка расходов за 30 дней", settings.permissions.finances, enabled) { onChange(settings.copy(permissions = settings.permissions.copy(finances = it))) }
-        PermissionRow("Последние сон и шаги", settings.permissions.health, enabled) { onChange(settings.copy(permissions = settings.permissions.copy(health = it))) }
-    }
-    Text("Отправка — только после предпросмотра и подтверждения.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-@Composable
-private fun PermissionRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-        headlineContent = { Text(label, style = MaterialTheme.typography.bodyLarge) },
-        trailingContent = {
-            Switch(checked = checked, onCheckedChange = onChange, enabled = enabled,
-                modifier = Modifier.semantics { contentDescription = label })
-        },
-    )
+    if (settings) AgentSettingsSheet(state, controller) { settings = false }
+    if (saved) SavedAgentSheet(state, controller) { saved = false }
+    if (clearChat) AlertDialog(onDismissRequest = { clearChat = false }, title = { Text("Начать новый разговор?") },
+        text = { Text("Переписка очистится. Подтверждённая память и сохранённые разборы останутся.") },
+        confirmButton = { TextButton(onClick = { controller.newChat(); clearChat = false }) { Text("Начать") } },
+        dismissButton = { TextButton(onClick = { clearChat = false }) { Text("Отмена") } })
 }

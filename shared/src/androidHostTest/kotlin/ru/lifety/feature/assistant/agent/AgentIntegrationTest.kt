@@ -7,6 +7,17 @@ import ru.lifety.core.model.Task
 import kotlin.test.*
 
 class AgentIntegrationTest {
+    @Test fun directoryDiscoveryAcceptsATrailingSeparatorWithoutAllowingEscapes(): Unit = runBlocking {
+        val root = Files.createTempDirectory("lifety-agent-directory").toFile()
+        try {
+            val workspace = AgentWorkspace(LocalAgentDisk(root.path))
+            workspace.write("notes/source.md", "data")
+            assertEquals(listOf("notes/source.md"), workspace.files("notes/").map { it.path })
+            assertFailsWith<AgentFault> { workspace.files("../") }
+            assertFailsWith<AgentFault> { workspace.files("/") }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun scriptToolSavesAndExecutesCodeInOneCallAndRejectsAStaleOverwriteBeforeRunning() = runBlocking {
         val root = Files.createTempDirectory("lifety-agent-inline-script").toFile()
         try {

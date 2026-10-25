@@ -43,8 +43,9 @@ class AgentWorkspace(private val disk: AgentDisk, private val scriptTimeoutMilli
     private val lock = Mutex()
     private val writable = setOf("scripts", "scratch", "reports", "notes")
     suspend fun files(prefix: String = ""): List<WorkspaceFile> = lock.withLock {
-        if (prefix.isNotEmpty()) checkedPath(prefix)
-        disk.paths().filter { prefix.isEmpty() || it == prefix || it.startsWith("$prefix/") }.sorted().map { path ->
+        val directory = if (prefix.length > 1) prefix.removeSuffix("/") else prefix
+        if (directory.isNotEmpty()) checkedPath(directory)
+        disk.paths().filter { directory.isEmpty() || it == directory || it.startsWith("$directory/") }.sorted().map { path ->
             val text = disk.read(path) ?: ""
             WorkspaceFile(path, text.encodeToByteArray().size, revision(text))
         }
