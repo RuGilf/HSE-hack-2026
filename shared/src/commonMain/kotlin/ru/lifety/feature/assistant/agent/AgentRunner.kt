@@ -66,6 +66,7 @@ class AgentRunner(
         try {
             if (!initialized) { fail("Сначала загрузите локальное состояние."); return }
             if (text.isBlank() || text.length > 8000) { fail("Сообщение должно содержать от 1 до 8000 символов."); return }
+            settleInterrupted()
             applyScopes(scopes)
             tools.prepare(scopes, state.value.document)
             mutableState.value = state.value.copy(phase = RunPhase.RUNNING, error = null, modelCalls = 0)
@@ -157,6 +158,7 @@ class AgentRunner(
     catch (_: Exception) { observation("tool_error", "Локальный источник недоступен; не подменяйте результат вымышленными данными.") }
 
     private suspend fun callModel(request: ModelRequest): ModelReply {
+        checkSize(request)
         mutableState.value = state.value.copy(modelCalls = state.value.modelCalls + 1)
         return model.complete(request).also { mutableState.value = state.value.copy(promptTokens = it.promptTokens) }
     }
@@ -224,14 +226,17 @@ class AgentRunner(
     }
 
     suspend fun reject(proposalId: String) = gate.withLock {
+        if (!initialized) return@withLock
         checkpoint(state.value.document.let { d -> d.copy(proposals = d.proposals.map { if (it.id == proposalId) it.copy(status = "rejected") else it }) })
     }
     suspend fun forget(factId: String) = gate.withLock {
+        if (!initialized) return@withLock
         tools.reset(state.value.document.scopes)
         checkpoint(state.value.document.let { it.copy(facts = it.facts.filterNot { f -> f.id == factId }, messages = emptyList(), proposals = emptyList(), summary = "", summaryThrough = 0) })
         tools.prepare(state.value.document.scopes, state.value.document)
     }
     suspend fun newChat() = gate.withLock {
+        if (!initialized) return@withLock
         checkpoint(state.value.document.copy(messages = emptyList(), proposals = emptyList(), summary = "", summaryThrough = 0))
         mutableState.value = state.value.copy(phase = RunPhase.IDLE, error = null)
     }

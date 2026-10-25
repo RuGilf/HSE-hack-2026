@@ -21,14 +21,21 @@ internal actual class LocalAgentDisk actual constructor(root: String) : AgentDis
         val result = mutableListOf<String>()
         fun walk(dir: File) {
             for (file in dir.listFiles() ?: throw AgentFault("storage", "Не удалось прочитать каталог")) {
-                if (file.name.startsWith('.')) continue
+                if (file.name.startsWith('.')) {
+                    if (file.name.endsWith(".bak") || file.name.endsWith(".tmp")) {
+                        val logical = File(file.parentFile, file.name.substring(1).dropLast(4)).relativeTo(base).invariantSeparatorsPath
+                        target(logical)
+                        result += logical
+                    }
+                    continue
+                }
                 val path = file.relativeTo(base).invariantSeparatorsPath
                 target(path)
                 if (file.isDirectory) walk(file) else result += path
                 if (result.size > 2048) throw AgentFault("disk_limit", "Слишком много файлов в рабочей папке")
             }
         }
-        walk(base); result
+        walk(base); result.distinct()
     }
     actual override suspend fun read(path: String): String? = withContext(Dispatchers.IO) {
         val file = target(path)
@@ -54,7 +61,10 @@ internal actual class LocalAgentDisk actual constructor(root: String) : AgentDis
     }
     actual override suspend fun delete(path: String) = withContext(Dispatchers.IO) {
         val file = target(path)
-        if (file.exists() && (!file.isFile || !file.delete())) throw AgentFault("storage", "Не удалось удалить файл")
+        for (candidate in listOf(file, File(file.parentFile, ".${file.name}.bak"), File(file.parentFile, ".${file.name}.tmp"))) {
+            if (candidate.canonicalFile != candidate.absoluteFile) throw AgentFault("invalid_path", "Символические ссылки запрещены")
+            if (candidate.exists() && (!candidate.isFile || !candidate.delete())) throw AgentFault("storage", "Не удалось удалить файл")
+        }
         Unit
     }
 }

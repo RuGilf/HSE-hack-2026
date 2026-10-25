@@ -6,6 +6,47 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class AgentDurabilityTest {
+    @Test fun oversizedCompactionStopsLocallyWithoutSendingOrLosingHistory() = runBlocking {
+        var calls = 0
+        val messages = (0..6).flatMap { i -> listOf(
+            AgentMessage("u$i", "user", "goal $i"),
+            AgentMessage("a$i", "assistant", calls = listOf(ToolCall("c$i", "files_write", "x".repeat(20000)))),
+            AgentMessage("t$i", "tool", "done", callId = "c$i"),
+        ) }
+        val store = MemoryAgentStore(AgentDocument(messages = messages))
+        val runner = AgentRunner(AgentModel { calls++; ModelReply("unexpected") }, store, AgentTools(emptyList()), now = { 1 })
+        runner.initialize(); runner.send("continue", AgentScopes())
+        assertEquals(0, calls)
+        assertEquals(RunPhase.ERROR, runner.state.value.phase)
+        assertTrue(store.document!!.messages.any { it.id == "a0" && it.calls.single().arguments.length == 20000 })
+    }
+
+    @Test fun failedInitializationPreventsAllDocumentMutations() = runBlocking {
+        var writes = 0
+        val store = object : AgentStore {
+            override suspend fun read(): AgentDocument? = error("unreadable existing checkpoint")
+            override suspend fun write(document: AgentDocument) { writes++ }
+        }
+        val runner = AgentRunner(AgentModel { ModelReply() }, store, AgentTools(emptyList()), now = { 1 })
+        runner.initialize(); runner.newChat(); runner.forget("f"); runner.reject("p")
+        assertEquals(0, writes)
+        assertEquals(RunPhase.ERROR, runner.state.value.phase)
+    }
+
+    @Test fun nextSendSettlesAResultLostByAnArchiveFailure() = runBlocking {
+        var step = 0
+        val runner = AgentRunner(AgentModel { request ->
+            if (step++ == 0) ModelReply(calls = listOf(ToolCall("lost", "missing", "{}"))) else {
+                assertTrue(request.messages.any { it.role == "tool" && it.callId == "lost" })
+                ModelReply("recovered")
+            }
+        }, MemoryAgentStore(), AgentTools(emptyList(), archive = { _, _ -> error("archive unavailable") }), now = { 1 })
+        runner.initialize(); runner.send("first", AgentScopes())
+        assertEquals(RunPhase.ERROR, runner.state.value.phase)
+        runner.send("continue", AgentScopes())
+        assertEquals(RunPhase.IDLE, runner.state.value.phase)
+    }
+
     @Test fun compactsLargeToolArgumentsAndPinsTheCurrentUserGoal() = runBlocking {
         val old = listOf(
             AgentMessage("u0", "user", "old goal"),

@@ -9,6 +9,21 @@ import kotlinx.coroutines.flow.*
 import kotlin.test.*
 
 class WorkspaceTest {
+    @Test fun resetErasesAnOrphanBackupAndItCannotBeResurrected(): Unit = runBlocking {
+        val root = Files.createTempDirectory("lifety-agent-backup").toFile()
+        try {
+            root.resolve("reports").mkdirs()
+            root.resolve("reports/.private.md.bak").writeText("revoked personal data")
+            root.resolve("reports/.other.md.tmp").writeText("unfinished private data")
+            val disk = LocalAgentDisk(root.path)
+            AgentWorkspace(disk).clear()
+            assertNull(disk.read("reports/private.md"))
+            assertNull(disk.read("reports/other.md"))
+            assertFalse(root.resolve("reports/.private.md.bak").exists())
+            assertFalse(root.resolve("reports/.other.md.tmp").exists())
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun runsWrittenAnalysisWithExactMoneyAndPersistsItsReport() = runBlocking {
         val root = Files.createTempDirectory("lifety-agent").toFile()
         try {
