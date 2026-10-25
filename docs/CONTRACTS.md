@@ -6,8 +6,9 @@ Core & Planner P0 реализован в ветке `feature/core`, worktree
 `/Users/rugilf/Projects/lifety-core`. Основной репозиторий:
 `/Users/rugilf/Projects/HSE-hack-2026`; слияние в main не выполняется этой задачей.
 Реализованы SQLite-репозитории всех трёх доменов, задачи, календарь, DI и навигация.
-Finance, Dashboard, Assistant и Health остаются точками интеграции других агентов;
-их функциональные исходники в этой ветке не изменены.
+Finance интегрирован из `origin/feature/finance` (`847f405`): его экран использует
+общий expenses repository. В iOS-адаптере исправлена совместимость NSDate factory.
+Dashboard, Assistant и Health остаются точками интеграции третьего агента.
 Два Gradle-модуля: `:androidApp` (запуск Android) и `:shared` (KMP, включая Compose).
 Границы функций — каталоги и Kotlin-пакеты внутри `:shared`, не отдельные
 Gradle-модули. Это сокращает настройку и число общих файлов при параллельной работе.
@@ -191,8 +192,10 @@ Android: `ru.lifety.android.LifetyApplication` в
 `null` допустим для изолированного preview/test host; production Android/iOS
 entry points передают реальные репозитории. Tasks и Calendar при `null` показывают
 явное состояние «хранилище не подключено». Другим экранам следует делать так же.
-Notification service не является Compose-экраном: его отдельный DI-адаптер и
-Manifest-компоненты согласуются с Codex 1 после предоставления классов Codex 2.
+Finance notification service не обращается к БД: он публикует неподтверждённые
+предложения в `FinanceNotifications.inbox`; запись выполняет FinanceScreen
+через существующий repository только после подтверждения. Отдельный DI-адаптер
+сервису не нужен, отдельный Android process запрещён (очередь общая в памяти).
 
 ## Навигационные интеграционные точки
 
@@ -272,11 +275,17 @@ OkHttp на Android, Darwin на iOS, JSON ContentNegotiation, `expectSuccess = 
 Codex 3 размещает будущую AI-логику в `feature/assistant/ai/**`, использует фабрику;
 новые общие зависимости запрашивает у Codex 1. API-ключи не коммитить.
 
-Для notifications зарезервирован пакет `ru.lifety.platform.notifications` в
-androidMain. Классов, разрешений, receivers и services пока нет. Codex 2 передаёт
-Codex 1 конкретные изменения Manifest/entry point/Gradle для интеграции. Не добавлять
-Android imports в commonMain. Публичный notification API согласуется с Codex 1
-до его использования tasks/calendar; в baseline такого API нет.
+Android notification adapter реализован Codex 2 в
+`ru.lifety.platform.notifications`. `ExpenseNotificationListener` зарегистрирован
+в `androidApp/src/main/AndroidManifest.xml` с service permission
+`android.permission.BIND_NOTIFICATION_LISTENER_SERVICE`, `exported=false`, без
+отдельного процесса. Не требуется runtime POST_NOTIFICATIONS и не добавляется
+uses-permission BIND_NOTIFICATION_LISTENER_SERVICE. Сам пользователь выбирает
+банки, включает consent и выдаёт notification listener access в Android Settings.
+По умолчанию импорт выключен. Сервис не сохраняет расходы автоматически.
+Точные ограничения и инструкция демонстрации —
+`C/feature/finance/INTEGRATION.md`. Живой банковский push и системное разрешение
+пока не тестировались; подтверждение демо-уведомления проверено в Android.
 
 ## Параллельная работа следующих трёх агентов
 
@@ -332,7 +341,7 @@ assistant-ветки могут продолжать работу с прежн�
   выбирается по стандартной семантике kotlinx-datetime (раннее смещение).
 - `C/core/planner/TaskListViewModel.kt` — общий StateFlow state задач/календаря;
   в `C/core/ui/TaskCard.kt` и `LifetyTheme.kt` находятся общий компонент и M3-тема.
-- Нет recurrence, приоритетов, длительности или уведомлений. Контракты моделей
+- Нет recurrence, приоритетов, длительности или напоминаний о дедлайнах. Контракты моделей
   не расширены. Notifications — зона Codex 2, AI/health UI — Codex 3.
 
 ## Версии и источники

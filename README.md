@@ -1,9 +1,11 @@
-# Lifety — Core & Planner P0
+# Lifety — Core, Planner & Finance
 
 Kotlin Multiplatform + Compose Multiplatform, Android-first. Реализованы локальные
 SQLDelight-репозитории, задачи, календарь, общий DI и Compose Navigation.
-Finance, Dashboard, Assistant и Health — точки входа других агентов, их UI-код
-этой задачей не изменён.
+Finance объединён из `origin/feature/finance` (`847f405`): ручные расходы,
+сводки и подтверждённый импорт уведомлений подключены к общей SQLite.
+Dashboard, Assistant и Health пока остаются входами третьего агента.
+Текущая интеграция описана в [docs/INTEGRATION_STATUS.md](docs/INTEGRATION_STATUS.md).
 
 Рабочая ветка: **feature/core**, worktree: `/Users/rugilf/Projects/lifety-core`.
 Основной checkout `/Users/rugilf/Projects/HSE-hack-2026` остаётся на main;
@@ -44,6 +46,11 @@ APK относительно корня worktree:
   задач и переход в общий редактор. Учитывает и план, и дедлайн; совпадающие даты
   не дублируют задачу. Создание из календаря предлагает выбранный день в 09:00.
 - Material 3 с карточками, подтверждением удаления, FAB, светлой/тёмной темой.
+- Finance: ручное добавление/редактирование/удаление расходов, период и валюта,
+  категории и сводки, сессионный бюджет. Банковские уведомления сохраняются
+  только после подтверждения. Демо-уведомление работает без системного доступа.
+- Android notification listener зарегистрирован в Manifest. Чтение выбранных
+  банков включается пользователем через отдельное системное разрешение.
 - `TaskRepository`, `ExpenseRepository`, `HealthRepository` сохраняют данные
   в `lifety.db`; SQLDelight Flow уведомляет подписчиков после записи.
 - Android Application владеет одним контейнером БД, общим для всех экранов и
@@ -55,7 +62,7 @@ APK относительно корня worktree:
 Модели и публичные repository interfaces не изменены. Формат SQLite-таблиц и
 schema version 1 сохранены: на этом этапе добавлены запросы, миграция не нужна.
 Нет сервера, регистрации, облачной БД, Firebase, AI-реализации и внешних календарей.
-P1 (уведомления, повторы, приоритеты, длительность) не реализован.
+Planner P1 (напоминания о дедлайнах, повторы, приоритеты, длительность) не реализован.
 
 ## Структура кода
 
@@ -86,7 +93,8 @@ shared/src/commonMain/kotlin/ru/lifety/
   feature/
     tasks/{TasksScreen,TaskEditorScreen,TaskEditorViewModel}.kt
     calendar/CalendarScreen.kt
-    finance/, dashboard/, assistant/, health/  Other agents' entries
+    finance/                                  Expenses + confirmed imports
+    dashboard/, assistant/, health/            Third agent entries
 shared/src/commonMain/sqldelight/ru/lifety/database/Lifety.sq
 shared/src/androidMain/                        SQLite/HTTP platform drivers
 shared/src/iosMain/                            Drivers + MainViewController
@@ -114,8 +122,10 @@ Production entry points передают реальный набор; `null` о�
 Codex 2 владеет Finance/Notifications; Codex 3 — Dashboard/Assistant/Health/AI.
 Новые зависимости и изменения Manifest/схемы/routes согласуются с Codex 1.
 От них не требуется ничего для работоспособности текущего Planner P0.
-Для notifications нужны конкретные Android-классы и запрос на их DI/Manifest
-интеграцию — в этом коммите уведомления не создаются.
+Finance listener уже зарегистрирован. Он не требует репозитория в сервисе:
+публикует неподтверждённые предложения в общую очередь, а экран сохраняет
+подтверждённые расходы через `LocalRepositories.current.expenses`.
+Самостоятельное включение notification access не выполняется.
 
 ## Проверки
 
@@ -130,8 +140,7 @@ Android SDK **37**, Build Tools **36.0.0**, Xcode **27.1**.
 ```
 
 - Android debug/release assembly и lint — **BUILD SUCCESSFUL**.
-- **13 host tests: 0 failures, 0 errors, 0 skipped**. Это 5 прежних проверок,
-  4 новых проверки репозиториев и 4 проверки дат/календаря.
+- **34 host tests: 0 failures, 0 errors, 0 skipped**: 13 Core/Planner и 21 Finance/Notifications.
 - Проверены реактивные insert/update/delete, полная замена nullable полей,
   стабильная сортировка, latest health по максимальному timestamp,
   точность денег >2⁵³, закрытие/повторное открытие файловой SQLite для всех
@@ -144,12 +153,18 @@ Android SDK **37**, Build Tools **36.0.0**, Xcode **27.1**.
 обновлению фиксированных зависимостей, launcher icon и data extraction rules.
 Release APK unsigned; публикационная подпись не настраивалась.
 
-Не проверено: запуск/визуальное взаимодействие на устройстве, Android process
-restart на настоящем driver, iOS framework linking/runtime/physical device.
-`adb devices` не нашёл устройств, `emulator -list-avds` не нашёл настроенных AVD.
-Файловая персистентность проверена реальной SQLite JDBC с повторным открытием,
-а не имитацией в памяти. Несохранённый черновик редактора переживает rotation
-через ViewModel, но не гарантируется после завершения процесса.
+После объединения выполнен smoke test на временном эмуляторе **Android 15 API 35,
+arm64**: установка и холодный запуск APK, создание задачи с датой, открытие и
+редактирование из календаря, сохранение ручного расхода 125,50 RUB,
+подтверждение демо-уведомления 349,90 RUB, проверка итога 475,40 RUB.
+Затем процесс принудительно остановлен и запущен снова: задача и оба расхода
+восстановились в интерфейсе; содержимое реальной Android SQLite также проверено.
+Ошибок AndroidRuntime не обнаружено.
+
+Не проверены физический Android, API 24–25 runtime, реальный банковский push и
+системный notification access, iOS framework linking/runtime/device arm64.
+Несохранённые черновики и неподтверждённые notification suggestions могут теряться
+после завершения процесса; сохранённые данные остаются в SQLite.
 
 Для ручного smoke test на устройстве: создать задачу с планом и дедлайном,
 изменить её из календаря, отметить выполнение, проверить фильтры, перезапустить
