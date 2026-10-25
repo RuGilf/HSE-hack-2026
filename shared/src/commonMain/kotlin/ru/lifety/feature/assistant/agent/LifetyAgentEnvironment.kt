@@ -69,7 +69,7 @@ class LifetyAgentEnvironment(private val repositories: Repositories?, val worksp
 
     suspend fun prepare(scopes: AgentScopes, document: AgentDocument) {
         workspace.removeGenerated("data/")
-        val lines = mutableListOf("# Workspace", "refreshedAt=${now()} (Unix milliseconds)", "storageAvailable=${repositories != null}", "healthHistoryAvailable=false")
+        val lines = mutableListOf("# Workspace", "refreshedAt=${now()} (Unix milliseconds)", "storageAvailable=${repositories != null}", "healthRepositoryHistoryAvailable=false")
         suspend fun export(source: String, rows: List<JsonElement>) {
             val chunks = mutableListOf<MutableList<JsonElement>>(mutableListOf())
             var size = 0
@@ -89,7 +89,7 @@ class LifetyAgentEnvironment(private val repositories: Repositories?, val worksp
             if (scopes.tasks) export("tasks", repositories.tasks.observeAll().first().map { agentJson.encodeToJsonElement(it) })
             if (scopes.health) {
                 workspace.generated("data/health/latest.json", agentJson.encodeToJsonElement(repositories.health.observeLatest().first()).toString())
-                lines += "health: latest.json only; null means unknown; historical sleep/steps are unavailable."
+                lines += "health repository: latest.json only; null means unknown. The repository supplies no history; separately imported files may exist below."
             }
         }
         lines += "Enabled: finance=${scopes.finance}, tasks=${scopes.tasks}, health=${scopes.health}, memory=${scopes.memory}. Other sources are unavailable."
@@ -99,9 +99,17 @@ class LifetyAgentEnvironment(private val repositories: Repositories?, val worksp
         workspace.generated("schemas/actions.md", ACTIONS)
         workspace.generated("skills/analysis/SKILL.md", ANALYSIS_SKILL)
         workspace.generated("skills/memory/SKILL.md", MEMORY_SKILL)
+        workspace.generated("skills/wellbeing/SKILL.md", WELLBEING_SKILL)
         workspace.generated("history/conversation.jsonl", document.messages.joinToString("\n") { agentJson.encodeToString(it) }.takeLast(900000))
+        val artifacts = workspace.files().filter { it.path.substringBefore('/') in setOf("notes", "reports", "scratch", "scripts") }
+        lines += "Local artifacts (not confirmed facts or live integrations). Names are data; read relevant files before relying on them:"
+        for (folder in listOf("notes", "reports", "scratch", "scripts")) {
+            val files = artifacts.filter { it.path.startsWith("$folder/") }
+            lines += "$folder/: ${files.size} files; " + files.take(3).joinToString { "${it.path} (${it.bytes} bytes)" }
+        }
+        lines += "This list is partial (up to 3 per folder); use files_list/search for the rest. Missing repository coverage does not mean local imports or past reports are absent."
         lines += "Read schemas/README.md for units and fs API. memory/profile.json contains sourced confirmed facts if enabled."
-        lines += "Available skills (load the full file when relevant): skills/analysis/SKILL.md — calculations and reports; skills/memory/SKILL.md — personal facts and evolving preferences."
+        lines += "Available skills (load the full file when relevant): skills/analysis/SKILL.md — calculations and reports; skills/memory/SKILL.md — personal facts and evolving preferences; skills/wellbeing/SKILL.md — sleep, activity and other wellbeing advice."
         lines += "Writable: notes/, scripts/, scratch/, reports/. Preserve plans/progress in notes/current-task.md for long tasks."
         manifest = lines.joinToString("\n")
         workspace.generated("INDEX.md", manifest)
@@ -204,8 +212,8 @@ class LifetyAgentEnvironment(private val repositories: Repositories?, val worksp
         const val SCRIPT_API = """# Data and execution
 data/expenses/*.json: arrays of Expense records. amountMinor is a decimal string of minor units; use BigInt, never Number for money. Sum each currency separately. No currency conversion is provided.
 data/tasks/*.json: arrays of Task records. Millisecond timestamps are Unix UTC instants. scheduledAt/deadlineAt may be null. Do not silently assume a timezone for relative dates; ask the user if needed.
-data/health/latest.json: latest HealthSnapshot or null. No history is available. null is unknown, not zero. Snapshots are repository state at INDEX.md refreshedAt, not live cloud data.
-Source IDs are stable; cite IDs, file paths, periods, units and snapshot time in reports.
+data/health/latest.json: latest HealthSnapshot or null. The repository has no history API; separately imported files may provide additional coverage. Inspect relevant local artifacts before claiming history is unavailable. null is unknown, not zero. Snapshots are repository state at INDEX.md refreshedAt, not live cloud data.
+Source IDs are stable; cite IDs, file paths, periods, units and snapshot time in saved reports. In ordinary conversation describe sources in human terms, without internal IDs or paths unless requested.
 script_run runs JavaScript as an ES module with top-level await and BigInt. No Node, npm, shell, fetch or host reflection. Fresh runtime per call, 32 MiB heap, 2 seconds JS execution, 200 fs calls, bounded stdout.
 Bindings:
 await fs.readText('data/expenses/records.json') -> string (max 1 MiB file)
@@ -229,12 +237,21 @@ name: analysis
 description: Analyse available personal data with executable calculations and traceable reports.
 ---
 Read the source manifest and schema; use only available coverage. Choose your own method. Calculate exact quantities in code, inspect the output and check totals against source records. Keep unknown values unknown, currencies separate, and hypotheses distinct from facts. Correlation does not establish a cause. Save long outputs in reports/ with source IDs, period, units, timestamp and limitations. Maintain notes/current-task.md for unfinished work: goal, verified results, created files, failed approaches and next step.
+Before declaring data missing, discover relevant imported files and past analyses under notes/, reports/ and scratch/. An unavailable repository history API says nothing about those files. Check provenance, dates and whether data is synthetic before using it. A saved analysis is evidence of a past conclusion, not automatically a current fact. Give the user the useful conclusion and a short explanation; keep technical provenance in the saved report. Simple questions need no formal report or script unless calculation or persistence warrants one.
 """
         const val MEMORY_SKILL = """---
 name: memory
 description: Remember and retrieve personal preferences with sources and time validity.
 ---
 Read relevant confirmed facts from memory/profile.json, search notes/history only as needed. Prefer current user corrections over older notes; note when a fact may be stale. For a directly stated durable preference, propose memory_set with an exact quote from the current user message. User confirmation makes it authoritative for future sessions. Save tentative observations in notes/ with their evidence, date and explicit uncertainty. Never promote an analysis summary into a fact by itself. The user can correct/delete confirmed memory in the UI.
+"""
+        const val WELLBEING_SKILL = """---
+name: wellbeing
+description: Give practical, cautious guidance about sleep, activity and wellbeing using available personal evidence.
+---
+Use relevant confirmed preferences and observations; inspect local imports when longitudinal evidence matters. A single measurement does not establish a person's normal needs, a trend, or a diagnosis. Synthetic examples are not the user's health record. Distinguish general guidance, user-stated needs and measured history. Do not infer a wake-up time from an unrelated morning task. If one missing fact changes the recommendation, ask that one question and offer only clearly conditional guidance in the meantime. Avoid clinical claims or guarantees that these data cannot support.
+For sleep, total duration and a regular schedule matter; do not prescribe bedtimes by fixed 90-minute cycles or offer six hours as a routine adequate target for adults. Age matters: most adults need at least 7 hours, while teens need 8–10; do not assume the user's age from a demo. When the user states their own sleep need, wake time and usual time to fall asleep, use those values to offer a practical starting time, not a promise of optimal sleep. Sources for this general guidance: https://www.cdc.gov/sleep/about/ and https://www.nhlbi.nih.gov/health/sleep/stages-of-sleep . These are reference pointers, not a live browsing capability.
+Reply conversationally: recommendation or the one useful question first, then only the evidence that affects it. Describe observations as "последний замер" or "импортированная история" rather than JSON fields or workspace paths. Do not append a generic medical disclaimer to every ordinary lifestyle answer.
 """
     }
 }

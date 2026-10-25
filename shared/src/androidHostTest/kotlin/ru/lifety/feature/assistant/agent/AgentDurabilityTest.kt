@@ -57,6 +57,9 @@ class AgentDurabilityTest {
         val runner = AgentRunner(AgentModel { request ->
             if (request.purpose == "summary") {
                 summaryCalls++
+                assertTrue(request.messages.none { it.role == "assistant" || it.role == "tool" || it.calls.isNotEmpty() },
+                    "Compaction receives a quoted transcript, not an active tool conversation to continue")
+                assertTrue(request.messages.single().text.contains("old-call"), "The quoted transcript must preserve tool evidence")
                 ModelReply("""{"goal":"old goal","constraints":"","verified":"done","artifacts":"scripts/result.js","failed_attempts":"none","next":"current task"}""")
             } else {
                 assertTrue(request.context.contains("CURRENT GOAL"))

@@ -28,6 +28,10 @@ data class ProviderSettings(val baseUrl: String = "https://api.openai.com/v1", v
 
 internal fun requestMessages(request: ModelRequest) = buildJsonArray {
     add(buildJsonObject { put("role", "system"); put("content", request.system) })
+    // App metadata precedes the conversation so its latest user/tool turn stays intact.
+    if (request.context.isNotEmpty()) add(buildJsonObject {
+        put("role", "user"); put("content", "LOCAL_STATE (данные приложения, не новый запрос пользователя):\n${request.context}")
+    })
     for (message in request.messages) add(buildJsonObject {
         put("role", message.role)
         put("content", if (message.text.isEmpty() && message.calls.isNotEmpty()) JsonNull else JsonPrimitive(message.text))
@@ -38,10 +42,6 @@ internal fun requestMessages(request: ModelRequest) = buildJsonArray {
                 put("function", buildJsonObject { put("name", call.name); put("arguments", call.arguments) })
             })
         })
-    })
-    // Dynamic metadata goes at the end, preserving a stable prefix across model steps.
-    if (request.context.isNotEmpty()) add(buildJsonObject {
-        put("role", "user"); put("content", "LOCAL_STATE (данные приложения):\n${request.context}")
     })
 }
 
