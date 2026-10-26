@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.lifety.core.model.Task
+import ru.lifety.core.planner.taskTimingError
 import ru.lifety.core.repository.TaskRepository
 import kotlin.uuid.Uuid
 
@@ -65,6 +66,10 @@ class TaskEditorViewModel(
         if (snapshot.saving) return
         if (task.title.isBlank()) {
             mutableState.update { it.copy(error = "Добавьте название задачи") }
+            return
+        }
+        taskTimingError(task)?.let { error ->
+            mutableState.update { it.copy(error = error) }
             return
         }
         persist { repository.upsert(task.copy(title = task.title.trim())) }

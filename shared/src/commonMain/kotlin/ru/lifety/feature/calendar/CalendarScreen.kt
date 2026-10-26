@@ -53,6 +53,8 @@ import ru.lifety.core.time.monthGrid
 import ru.lifety.core.time.russianMonths
 import ru.lifety.core.time.tasksOnDate
 import ru.lifety.core.time.today
+import kotlinx.coroutines.delay
+import kotlin.time.Clock
 import ru.lifety.core.ui.LifetyEmptyState
 import ru.lifety.core.ui.LifetyEmotion
 import ru.lifety.core.ui.LifetyIcon
@@ -69,7 +71,9 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
     val model = viewModel { TaskListViewModel(repository) }
     val state by model.state.collectAsState()
     val zone = TimeZone.currentSystemDefault()
-    val currentDay = today(zone)
+    var now by remember { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }
+    LaunchedEffect(Unit) { while (true) { delay(30_000); now = Clock.System.now().toEpochMilliseconds() } }
+    val currentDay = localDate(now, zone)
     var selectedIso by rememberSaveable { mutableStateOf(currentDay.toString()) }
     var monthIso by rememberSaveable { mutableStateOf(LocalDate(currentDay.year, currentDay.month.number, 1).toString()) }
     val selected = LocalDate.parse(selectedIso)
@@ -140,7 +144,7 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                 selectedTasks.isEmpty() -> item { LifetyEmptyState("Свободный день", "Оставь время для себя или добавь новый план.", emotion = LifetyEmotion.Calm, mascotSize = 72.dp) }
                 else -> items(selectedTasks, key = { it.id }, contentType = { "task" }) { task ->
                     androidx.compose.foundation.layout.Box(Modifier.animateItem(fadeInSpec = tween(LifetyMotion.Quick), placementSpec = tween(LifetyMotion.Standard), fadeOutSpec = tween(LifetyMotion.Quick))) {
-                    TaskCard(task, task.id in state.busyIds, onOpen = { planner?.openTask(task.id) }, onToggle = { model.toggle(task) })
+                    TaskCard(task, task.id in state.busyIds, onOpen = { planner?.openTask(task.id) }, onToggle = { model.toggle(task) }, now = now)
                     }
                 }
             }

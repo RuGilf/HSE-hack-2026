@@ -29,11 +29,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import ru.lifety.core.model.Task
+import ru.lifety.core.planner.formatPlannerTime
+import ru.lifety.core.time.localDate
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.plus
 import ru.lifety.core.time.formatDateTime
 import kotlin.time.Clock
 
 @Composable
-fun TaskCard(task: Task, busy: Boolean, onOpen: () -> Unit, onToggle: () -> Unit, onDelete: (() -> Unit)? = null) {
+fun TaskCard(task: Task, busy: Boolean, onOpen: () -> Unit, onToggle: () -> Unit, onDelete: (() -> Unit)? = null, now: Long = Clock.System.now().toEpochMilliseconds()) {
     var menu by remember { mutableStateOf(false) }
     val titleColor by animateColorAsState(
         if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
@@ -49,15 +53,23 @@ fun TaskCard(task: Task, busy: Boolean, onOpen: () -> Unit, onToggle: () -> Unit
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
                     color = titleColor)
                 task.scheduledAt?.let { Text("План · ${formatDateTime(it)}", style = MaterialTheme.typography.bodySmall) }
-                task.deadlineAt?.let {
-                    val overdue = !task.isCompleted && it < Clock.System.now().toEpochMilliseconds()
-                    Text("${if (overdue) "Просрочено" else "Дедлайн"} · ${formatDateTime(it)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (overdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (task.scheduledAt == null && task.deadlineAt == null) {
-                    Text("Без даты", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                task.deadlineAt?.let { deadline ->
+                    val overdue = !task.isCompleted && deadline < now
+                    val today = localDate(now)
+                    val date = localDate(deadline)
+                    val label = when {
+                        task.isCompleted -> "Срок · ${formatDateTime(deadline)}"
+                        overdue -> "Просрочено · ${formatDateTime(deadline)}"
+                        date == today -> "Сегодня до ${formatPlannerTime(deadline)}"
+                        date == today.plus(DatePeriod(days = 1)) -> "Завтра до ${formatPlannerTime(deadline)}"
+                        else -> "Дедлайн · ${formatDateTime(deadline)}"
+                    }
+                    Text(label, style = MaterialTheme.typography.bodySmall,
+                        color = when { overdue -> MaterialTheme.colorScheme.error
+                            !task.isCompleted && date == today -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant })
+                } ?: Text(if (task.scheduledAt == null) "Без даты и дедлайна" else "Дедлайн не задан",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (onDelete != null) {
                 Column {

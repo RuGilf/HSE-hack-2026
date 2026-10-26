@@ -35,7 +35,7 @@ fun PlanScreen(initialCalendar: Boolean = false, modifier: Modifier = Modifier) 
     val stateHolder = rememberSaveableStateHolder()
     Column(modifier.fillMaxSize()) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            listOf("Задачи", "Календарь").forEachIndexed { index, title ->
+            listOf("День", "Календарь").forEachIndexed { index, title ->
                 SegmentedButton(selected = calendar == (index == 1), onClick = { calendar = index == 1 },
                     shape = SegmentedButtonDefaults.itemShape(index, 2), label = { Text(title) })
             }
