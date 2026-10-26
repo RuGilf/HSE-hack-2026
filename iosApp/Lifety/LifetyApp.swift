@@ -9,16 +9,21 @@ struct LifetyIosApp: App {
     }
     var body: some Scene {
         WindowGroup {
-            LifetyRoot()
-                .ignoresSafeArea()
-                .preferredColorScheme(.dark)
+            ZStack {
+                // Fill the host's safe areas as well as the Compose content.
+                Color("LaunchBackground").ignoresSafeArea()
+                LifetyRoot().ignoresSafeArea()
+            }
+            .preferredColorScheme(.dark)
         }
     }
 }
 
 private struct LifetyRoot: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
-        MainViewControllerKt.MainViewController()
+        let controller = MainViewControllerKt.MainViewController()
+        controller.view.backgroundColor = UIColor(named: "LaunchBackground")
+        return controller
     }
     func updateUIViewController(_ controller: UIViewController, context: Context) {}
 }

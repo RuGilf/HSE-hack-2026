@@ -13,6 +13,13 @@ SwiftUI TabView и второй независимой системы маршр
 Compose используют один `MaterialTheme.colorScheme.background`; системные
 материал, SF Symbols, размер и подсветка выбранного пункта сохранены.
 
+Дополнительно фон SwiftUI host растянут до краёв через `ZStack` и
+`Color("LaunchBackground").ignoresSafeArea()`. View встроенного Compose controller
+получает тот же цвет из существующего asset. Таким образом, область под меню
+и вокруг системного home indicator не зависит от чёрного фона контейнера.
+После этой правки повторены iPhone portrait/landscape, редактор с экранной
+клавиатурой, Xcode build и Android build/host tests. Нативная капсула меню сохранена.
+
 ## Ручная проверка
 
 Использованы только отдельные QA simulators с локальными тестовыми данными:
