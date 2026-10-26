@@ -146,11 +146,14 @@ Dashboard, Finance/Notifications UI, manual Health и Assistant UI. Repository/A
 На iOS нижняя панель — нативный UIKit UITabBar с SF Symbols, системной формой
 и материалом. Height включает нижнюю safe area; native accessibility включена,
 касания передаются без задержки кооперативного распознавания Compose.
+Фон самого UITabBar и его Compose-контейнера совпадает с фоном экрана, чтобы
+вокруг плавающего системного материала не появлялась чёрная полоса.
 Маршруты остаются общими, календарь — внутри Плана. Android сохраняет Material 3.
 Основные формы и экраны остаются Compose; брендовая тёмная тема и зелёный акцент
 сохраняются. Системные разрешения Apple Health — стандартный HealthKit sheet,
 автоматического запроса доступа при запуске нет. Xcode host поддерживает iPhone
 и iPad, системное масштабирование и ориентации.
+Проверка панели на iPhone и iPad — [IOS_NAVIGATION_CHECK.md](IOS_NAVIGATION_CHECK.md).
 
 ## Планировщик сроков
 

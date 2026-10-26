@@ -18,6 +18,7 @@ import ru.lifety.app.navigation.AppDestination
 @Composable
 internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (AppDestination) -> Unit) {
     val currentSelect by rememberUpdatedState(onSelect)
+    val background = MaterialTheme.colorScheme.background
     val delegate = remember { object : NSObject(), UITabBarDelegateProtocol {
         override fun tabBar(tabBar: UITabBar, didSelectItem: UITabBarItem) {
             primarySections.getOrNull(didSelectItem.tag.toInt())?.let { currentSelect(it) }
@@ -29,7 +30,7 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
             accessibilityLabel = destination.title
         }
     } }
-    Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
+    Box(Modifier.fillMaxWidth().background(background)) {
         UIKitView(factory = {
             UITabBar().apply {
                 this.delegate = delegate
@@ -43,6 +44,10 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
             }
         }, modifier = Modifier.fillMaxWidth().height(49.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
             properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.NonCooperative, isNativeAccessibilityEnabled = true), update = { bar ->
+            // The standalone bar's transparent margins otherwise expose a black UIKit
+            // backing strip instead of the Compose screen behind its floating material.
+            bar.backgroundColor = UIColor(red = background.red.toDouble(), green = background.green.toDouble(),
+                blue = background.blue.toDouble(), alpha = 1.0)
             bar.selectedItem = items[primarySections.indexOf(selected).coerceAtLeast(0)]
         })
     }
