@@ -13,3 +13,8 @@ captures/
 *.jks
 .env
 .env.*
+
+# Xcode local state
+**/xcuserdata/
+*.xcuserstate
+DerivedData/

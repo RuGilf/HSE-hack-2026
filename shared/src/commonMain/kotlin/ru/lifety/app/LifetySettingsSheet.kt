@@ -35,7 +35,7 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
                 modifier = Modifier.clickable { scope.launch { sheet.hide(); onFinance() } },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 leadingContent = { LifetyIcon(LifetySymbol.Wallet) },
-                headlineContent = { Text("Банковские уведомления") }, supportingContent = { Text("Выбор банков и доступ — в финансах") },
+                headlineContent = { Text(if (isIos) "Финансы" else "Банковские уведомления") }, supportingContent = { Text(if (isIos) "Расходы, категории и бюджет" else "Выбор банков и доступ — в финансах") },
                 trailingContent = { LifetyIcon(LifetySymbol.Chevron) },
             )
             HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)

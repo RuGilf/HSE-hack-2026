@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ru.lifety.core.model.Expense
+import ru.lifety.core.ui.isIos
 import ru.lifety.core.ui.LifetyMotion
 import ru.lifety.core.ui.LocalRepositories
 import ru.lifety.core.ui.LifetyDateField
@@ -192,7 +193,7 @@ fun FinanceContent(
                     onEdit = { showBudget = true })
             }
         }
-        item {
+        if (!isIos) item {
             OutlinedCard(Modifier.fillMaxWidth()) {
                 ListItem(
                     modifier = Modifier.clickable { showImport = !showImport },

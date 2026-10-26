@@ -19,8 +19,11 @@ files, `local.properties`, credentials or build output. Before handing off, run
 the Android build and shared host tests specified in the README. Only claim
 checks that actually ran. Document missing device/iOS checks.
 
-For the Core & Planner delivery, work and commit in `feature/core` at
-`/Users/rugilf/Projects/lifety-core`. Do not merge into main as part of this task.
+The current working branch is `main` at `/Users/rugilf/Projects/lifety-core`.
+At the owner's request, the pre-iOS main (`f8c942e`) is preserved in
+`HSE-hack-2026`; old feature/codex branches have been removed. Their other
+worktree directories remain available with detached HEADs. Follow the user's
+current instructions when choosing a branch or publishing further changes.
 Public core models/repository signatures and all existing `XxxScreen(modifier)`
 entry points stay unchanged. Other agents consume `LocalRepositories`,
 `LocalPlannerNavigation` and optionally `LocalRootNavigator`; do not replace the

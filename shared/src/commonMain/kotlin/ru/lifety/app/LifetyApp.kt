@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -34,7 +31,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -60,14 +56,6 @@ import ru.lifety.feature.dashboard.DashboardScreen
 import ru.lifety.feature.finance.FinanceScreen
 import ru.lifety.feature.health.HealthScreen
 import ru.lifety.feature.tasks.TaskEditorScreen
-
-private val sections = listOf(
-    AppDestination.DASHBOARD to LifetySymbol.Home,
-    AppDestination.TASKS to LifetySymbol.Plan,
-    AppDestination.FINANCE to LifetySymbol.Wallet,
-    AppDestination.HEALTH to LifetySymbol.Heart,
-    AppDestination.ASSISTANT to LifetySymbol.Assistant,
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,24 +107,9 @@ fun LifetyApp(repositories: Repositories? = null) {
                     )
                 },
                 bottomBar = {
-                    if (!isEditor && !keyboardVisible) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 0.dp) {
-                        sections.forEach { (item, symbol) ->
-                            NavigationBarItem(selected = section == item,
-                                onClick = {
-                                    val target = if (item == AppDestination.TASKS) AppDestination.fromRoute(planRoute) else item
-                                    if (section != item) navigator.navigate(target)
-                                },
-                                icon = { LifetyIcon(symbol) },
-                                label = { Text(item.title, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                            )
-                        }
+                    if (!isEditor && !keyboardVisible) PlatformNavigationBar(section) { item ->
+                        val target = if (item == AppDestination.TASKS) AppDestination.fromRoute(planRoute) else item
+                        if (section != item) navigator.navigate(target)
                     }
                 },
             ) { padding ->

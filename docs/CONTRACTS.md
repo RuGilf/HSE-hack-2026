@@ -4,7 +4,10 @@
 
 Core & Planner P0 реализован в ветке `feature/core`, worktree
 `/Users/rugilf/Projects/lifety-core`. Основной репозиторий:
-`/Users/rugilf/Projects/HSE-hack-2026`; слияние в main не выполняется этой задачей.
+`/Users/rugilf/Projects/HSE-hack-2026`. Эти сведения описывают первоначальный
+этап: текущая рабочая ветка теперь `main` в `/Users/rugilf/Projects/lifety-core`;
+снимок до iOS находится в `HSE-hack-2026` (`f8c942e`). Старые feature/codex
+ветки удалены по последующему запросу владельца, рабочие каталоги сохранены.
 Реализованы SQLite-репозитории всех трёх доменов, задачи, календарь, DI и навигация.
 Finance интегрирован до `origin/feature/finance` (`c703a1f`): его экран использует
 общий expenses repository. Dashboard, Assistant и Health подключены из
@@ -226,7 +229,11 @@ Android launcher: `ru.lifety.android.MainActivity` в
 `androidApp/src/main/kotlin/ru/lifety/android/MainActivity.kt`.
 iOS entry: `ru.lifety.app.MainViewController()` в `I/app/MainViewController.kt`.
 Объявлены targets `android`, `iosArm64`, `iosSimulatorArm64`; framework `LifetyShared`
-статический. Полного Xcode host-приложения в baseline нет.
+статический. Xcode host теперь находится в `iosApp/Lifety.xcodeproj`, scheme
+`Lifety`, iOS 26.5+, arm64 device/simulator. Build Phase использует
+`:shared:embedAndSignAppleFrameworkForXcode`; Swift host перед созданием Compose
+controller подключает `IosServices.credentials` (Keychain) и `.health` (HealthKit).
+Подробности локального порта — `docs/IOS_PORT.md`.
 
 Каждый публичный вход функции — `@Composable fun XxxScreen(modifier: Modifier = Modifier)`:
 
@@ -304,7 +311,8 @@ OkHttp на Android, Darwin на iOS, JSON ContentNegotiation, `expectSuccess = 
 Фабрика не задаёт URL, ключ, AI provider и не отправляет запросов при запуске.
 Codex 3 размещает AI-логику в `feature/assistant/ai/**`, использует фабрику;
 новые общие зависимости запрашивает у Codex 1. API-ключи не коммитить.
-`AiProvider`/`KtorAiProvider`, `ContextBuilder`, `AssistantController` реализованы
+Legacy API (предыдущий экран): `AiProvider`/`KtorAiProvider`, `ContextBuilder`,
+`AssistantController` реализованы
 в feature-пакете без изменения Core. Разрешения всех категорий default-off,
 preview фиксирует JSON до явного Analyze; ключ хранится только в памяти процесса.
 Никаких записей в репозитории из AI. Полные контракты и ограничения —
@@ -313,8 +321,9 @@ preview фиксирует JSON до явного Analyze; ключ хранит
 Dashboard сохраняет прежнюю подписку на последние показатели. Android Health Connect
 читает дневные агрегаты сна/шагов за 30 дней только по явному действию, сохраняет
 пакет после предпросмотра и подтверждения. Модель неизменна. Правила группировки,
-совместимости и повторного импорта — в `docs/HEALTH_HISTORY.md`. Разрешения AI от этого не меняются. На iOS остаётся ручной ввод;
-HealthKit не подключён. Android-only connect-client 1.2.0-alpha06 использует
+совместимости и повторного импорта — в `docs/HEALTH_HISTORY.md`. Разрешения AI от этого
+не меняются. На iOS доступны ручной ввод и явный HealthKit-импорт через Swift host
+с предпросмотром (`docs/IOS_PORT.md`). Android-only connect-client 1.2.0-alpha06 использует
 READ_SLEEP/READ_STEPS и Activity объяснения. SDK и его bound service включаются
 только на API 28+, minSdk приложения остаётся 24 с точечным overrideLibrary.
 Записей в Health Connect, фонового чтения и новых разрешений нет. Добавлен только
@@ -333,22 +342,22 @@ uses-permission BIND_NOTIFICATION_LISTENER_SERVICE. Сам пользовате�
 `C/feature/finance/INTEGRATION.md`. Живой банковский push и системное разрешение
 пока не тестировались; подтверждение демо-уведомления проверено в Android.
 
-## Новый headless agent API
+## Agent API и текущий чат
 
 Пакет `ru.lifety.feature.assistant.agent` владеет AgentRuntime, AgentSession,
-AgentRunner, AgentWorkspace и LifetyAgentEnvironment; источник —
-`codex/native-agent-harness` (`df063fa`). Это отдельный Kotlin API без подключения
-к AssistantScreen. Существующий UI/AI, root DI и навигация сохраняются.
+AgentRunner, AgentWorkspace и LifetyAgentEnvironment. `AssistantScreen` подключён
+к runtime и `AgentChatController` после интеграции `9f8b945`/`8dc4ddf`; поддерживает
+Markdown, историю Health по разрешению, память и подтверждение proposals.
 Android: `createAndroidAgentRuntime(applicationContext)`; iOS:
 `createIosAgentRuntime()`. Сессия получает существующий `Repositories?`.
 Scopes default-off, HTTP начинается только с `session.start`; записи приложений —
-через proposals и явный `runner.approve`. Health read-only. Перед подключением
-нужен UI разрешений, точного preview действий, управления памятью и lifecycle.
-Android vault.save явно сохраняет шифрованный ключ; это не меняет process-only
-политику старого AssistantScreen. QuickJS 1.0.15 — common dependency, для host
-runtime подставляется JVM artifact. SQL/Manifest не меняются. Точный API,
-лимиты и порядок cancel/join/close — C/feature/assistant/agent/INTEGRATION.md.
-Результат интеграционной проверки — docs/NATIVE_AGENT_REVIEW.md.
+через proposals и явный `runner.approve`. Health read-only.
+Android vault.save сохраняет ключ через Keystore; iOS — через host Keychain.
+Legacy `feature/assistant/ai` остаётся в коде, но не является текущим экраном.
+QuickJS 1.0.15 — common dependency, для host runtime подставляется JVM artifact.
+SQL/Manifest не меняются. Точный API, лимиты и lifecycle —
+C/feature/assistant/agent/INTEGRATION.md. Результаты актуальной проверки iOS —
+`docs/IOS_PORT.md`; прежняя проверка headless API — `docs/NATIVE_AGENT_REVIEW.md`.
 
 ## Параллельная работа следующих трёх агентов
 
@@ -368,7 +377,8 @@ runtime подставляется JVM artifact. SQL/Manifest не меняют�
    и согласованной проверки сборки. Не создавать сервер, облачную БД, регистрацию,
    векторный поиск или второе SQLite-решение.
 
-На этом ноутбуке worktree уже подготовлены:
+Историческое распределение worktree (после очистки прежние feature-ветки удалены,
+`lifety-core` работает на `main`, остальные каталоги сохранены с detached HEAD):
 
 | Ветка | Worktree |
 | --- | --- |
@@ -440,3 +450,20 @@ AgentMessage/ModelReply получили только optional reasoningDetails/
 точного round trip метаданных провайдера; старые private checkpoints читаются.
 Core models, repository interfaces, SQL и public screen signatures не менялись.
 Настройки и фактические live test results — docs/OPENROUTER_API.md.
+
+## iOS platform bindings — 26 октября 2026
+
+`C/app/PlatformNavigationBar.kt`: общий expect, actual Android сохраняет Material 3,
+actual iOS использует UIKit UITabBar с SF Symbols. Маршруты и сигнатуры экранов прежние.
+`C/core/ui/PlatformStyle.kt` — внутренний expect/actual `isIos` для платформенных
+подписей и скрытия недоступного notification listener.
+
+`I/core/platform/IosServices.kt`: публичные host-протоколы `IosCredentialStorage`
+(read/write), `IosHealthSource` (available, requestAccess, readDays, cancelRead).
+Swift-реализации находятся в `iosApp/Lifety`. HealthSnapshot и репозитории прежние.
+Keychain сохраняет provider settings + key одним элементом с
+WhenUnlockedThisDeviceOnly. HealthKit не сообщает статус read-разрешений; UI не
+делает вывода о разрешении из успешного показа диалога или пустого результата.
+Ручные и подтверждённые импортированные записи используют одну SQLite БД.
+После локальной проверки владелец разрешил публикацию iOS-порта в main;
+предыдущее состояние main (`f8c942e`) сохранено в ветке `HSE-hack-2026`.

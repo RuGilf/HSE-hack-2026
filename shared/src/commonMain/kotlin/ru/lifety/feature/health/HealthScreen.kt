@@ -97,7 +97,7 @@ fun HealthScreen(modifier: Modifier = Modifier) {
                 item {
                     Card(Modifier.fillMaxWidth()) {
                         ListItem(modifier = Modifier.clickable(enabled = !importBusy) { showImport = !showImport },
-                            headlineContent = { Text("Импорт Health Connect") }, supportingContent = { Text("Сон и шаги за последние 30 дней") },
+                            headlineContent = { Text(if (isIos) "Импорт из Apple Health" else "Импорт Health Connect") }, supportingContent = { Text("Сон и шаги за последние 30 дней") },
                             trailingContent = { Text(if (showImport) "Скрыть" else "Открыть", color = MaterialTheme.colorScheme.primary) })
                         AnimatedVisibility(showImport, enter = LifetyMotion.RevealEnter, exit = LifetyMotion.RevealExit) {
                             HealthConnectSection(repository, enabled = repository != null && !state.saving, onBusyChanged = { importBusy = it })

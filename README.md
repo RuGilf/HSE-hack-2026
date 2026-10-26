@@ -10,9 +10,10 @@ Finance обновлён до `origin/feature/finance` (`c703a1f`): CRUD, пер
 выбор сна/шагов, явное чтение, предпросмотр и подтверждение локального сохранения.
 Текущая интеграция описана в [docs/INTEGRATION_STATUS.md](docs/INTEGRATION_STATUS.md).
 
-Рабочая ветка: **feature/core**, worktree: `/Users/rugilf/Projects/lifety-core`.
-Основной checkout `/Users/rugilf/Projects/HSE-hack-2026` остаётся на main;
-самостоятельное слияние в main не выполнялось.
+Рабочая ветка: **main**, worktree: `/Users/rugilf/Projects/lifety-core`.
+Ветка **HSE-hack-2026** сохраняет состояние main до iOS-порта (`f8c942e`).
+Прежние feature/codex-ветки удалены по запросу владельца; их Git-история
+дополнительно сохранена в локальном bundle. Рабочие папки агентов сохранены.
 
 ## Запуск Android
 
@@ -38,6 +39,35 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 
 APK относительно корня worktree:
 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`.
+
+## Запуск iOS
+
+Готовый Xcode host: `iosApp/Lifety.xcodeproj`, scheme **Lifety**.
+Нужны macOS, Xcode 27.1, JDK 21; iPhone/iPad **iOS 26.5+**, симулятор arm64
+на Apple Silicon. Минимум выбран с учётом уже используемых native binaries
+QuickJS/Compose; более старые iOS не заявляются поддерживаемыми.
+
+Откройте проект в Xcode, выберите iPhone Simulator и Run. Build Phase сам соберёт
+и подключит `LifetyShared` из текущих Kotlin-исходников. CocoaPods, сервер и
+генератор Xcode-проекта не нужны. Для терминала:
+
+```sh
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+./scripts/build-ios-simulator.sh
+```
+
+Приложение: `build/ios/Build/Products/Debug-iphonesimulator/Lifety.app`.
+Для физического iPhone выберите свою Team в Signing & Capabilities, проверьте
+HealthKit capability и provisioning profile, затем Run. Team и учётная запись
+Apple в исходники не включены. Не следует устанавливать simulator .app на телефон.
+
+Нижняя панель iOS — настоящий UIKit UITabBar с SF Symbols и системным стеклом,
+пять общих разделов и их данные сохранены. Health читает сон/шаги из Apple Health
+по кнопке, показывает 30 дневных итогов перед сохранением. API-ключ и настройки
+провайдера после явного сохранения хранятся в Keychain, а не в файлах агента.
+Банковские уведомления остаются Android-only; на iOS доступен ручной учёт финансов.
+Подробности, команды и границы проверки — [docs/IOS_PORT.md](docs/IOS_PORT.md).
 
 ## Android UI polish
 
@@ -118,8 +148,8 @@ iOS Simulator arm64 compile — успешны. Результаты ниже, �
 schema version 1 сохранены: на этом этапе добавлены запросы, миграция не нужна.
 Нет сервера, регистрации, облачной БД, Firebase и внешних календарей.
 Health Connect подключён только на Android 9+: дневные итоги сна и шагов
-за последние 30 календарных дней, включая текущий неполный день. Фонового импорта нет. На iOS остаётся ручной ввод;
-HealthKit не подключён. Особенности SDK и проверок — в
+за последние 30 календарных дней, включая текущий неполный день. На iOS аналогичный
+явный импорт реализован через HealthKit. Фонового импорта на обеих платформах нет. Особенности SDK и проверок — в
 `shared/src/commonMain/kotlin/ru/lifety/feature/health/INTEGRATION.md`.
 Planner P1 (напоминания о дедлайнах, повторы, приоритеты, длительность) не реализован.
 
