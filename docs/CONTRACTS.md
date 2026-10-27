@@ -554,3 +554,26 @@ interface PersonRepository {
   без Task-копий; 29 февраля → 28 февраля в невисокосный год.
   Редактирование/удаление человека сразу отражается в календаре.
 - Нет новых разрешений, внешнего календаря или доступа AI к карточкам людей.
+
+
+## Списки в карточках людей / нативная дата iOS
+
+- Person / PersonRepository / SQL schema **v3** не меняются. `interests`, `hobbies`,
+  `giftIdeas` остаются String: один пункт на строку, без JSON. Старый текст
+  отображается списком по переносам строк; запятые и URL не разделяются.
+- `feature/people/PersonNotes.kt`: internal codec `personNoteItems`,
+  `personNoteText`, `replacePersonNoteItem`, `personNotePreview`. Порядок сохраняется,
+  пробелы по краям и пустые строки убираются при сохранении. Лимит 10 000 символов
+  относится ко всему полю, а не к каждому пункту.
+- `PersonNoteListEditor.kt`: отдельные редактируемые строки с удалением, добавлением,
+  фокусом в новой строке и многострочной вставкой. Списки черновика используют
+  `rememberSaveable` / `listSaver`, пустые новые пункты в БД не записываются.
+- `feature/people/BirthdayPicker.kt`: internal `BirthdaySelection(day, month, year?)`
+  и expect `BirthdayPickerDialog(initial, onConfirm, onDismiss)`.
+  `androidMain/.../people/BirthdayPicker.android.kt` — M3 DatePicker;
+  `iosMain/.../people/BirthdayPicker.ios.kt` — настоящий UIKit UIPickerView в
+  Compose-диалоге, три колонки, «Без года», native accessibility/касания.
+  Native view прозрачный и использует `placedAsOverlay = true`.
+- Дата передаётся как гражданский день/месяц/необязательный год. Смена месяца/года
+  ограничивает день числом дней этого месяца; неизвестный год допускает 29 февраля.
+  Выбор применяется только по «Готово», отмена не меняет поля карточки.

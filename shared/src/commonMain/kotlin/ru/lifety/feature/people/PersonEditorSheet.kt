@@ -3,6 +3,8 @@ package ru.lifety.feature.people
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,18 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.number
 import ru.lifety.core.model.Person
 import ru.lifety.core.model.personValidationError
 import ru.lifety.core.repository.PersonRepository
-import ru.lifety.core.time.localDate
 import ru.lifety.core.time.today
 import ru.lifety.core.ui.LifetyIcon
 import ru.lifety.core.ui.LifetySymbol
@@ -36,17 +32,19 @@ internal fun PersonEditorSheet(initial: Person, isNew: Boolean, repository: Pers
     var day by rememberSaveable(initial.id) { mutableStateOf(initial.birthdayDay?.toString().orEmpty()) }
     var month by rememberSaveable(initial.id) { mutableStateOf(initial.birthdayMonth?.toString().orEmpty()) }
     var year by rememberSaveable(initial.id) { mutableStateOf(initial.birthYear?.toString().orEmpty()) }
-    var interests by rememberSaveable(initial.id) { mutableStateOf(initial.interests) }
-    var hobbies by rememberSaveable(initial.id) { mutableStateOf(initial.hobbies) }
-    var gifts by rememberSaveable(initial.id) { mutableStateOf(initial.giftIdeas) }
+    val itemsSaver = listSaver<List<String>, String>(save = { it }, restore = { it })
+    var interests by rememberSaveable(initial.id, stateSaver = itemsSaver) { mutableStateOf(personNoteItems(initial.interests)) }
+    var hobbies by rememberSaveable(initial.id, stateSaver = itemsSaver) { mutableStateOf(personNoteItems(initial.hobbies)) }
+    var gifts by rememberSaveable(initial.id, stateSaver = itemsSaver) { mutableStateOf(personNoteItems(initial.giftIdeas)) }
     var attempted by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
-    var pickingDate by remember { mutableStateOf(false) }
+    var pickingDate by rememberSaveable { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
     val currentDay = today()
-    val draft = Person(initial.id, name.trim(), month.toIntOrNull(), day.toIntOrNull(), year.toIntOrNull(), interests.trim(), hobbies.trim(), gifts.trim())
+    val draft = Person(initial.id, name.trim(), month.toIntOrNull(), day.toIntOrNull(), year.toIntOrNull(), personNoteText(interests), personNoteText(hobbies), personNoteText(gifts))
     val inputError = when {
         day.isNotEmpty() && day.toIntOrNull() == null || month.isNotEmpty() && month.toIntOrNull() == null || year.isNotEmpty() && year.toIntOrNull() == null -> "Проверьте дату рождения"
         else -> personValidationError(draft, currentDay)
@@ -86,27 +84,25 @@ internal fun PersonEditorSheet(initial: Person, isNew: Boolean, repository: Pers
                     enabled = !blocked, isError = attempted && name.isBlank(), maxLines = 3,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("День рождения", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { pickingDate = true }, enabled = !blocked,
-                            modifier = Modifier.semantics { contentDescription = "Выбрать день рождения в календаре" }) { LifetyIcon(LifetySymbol.Calendar) }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(day, { day = it.filter(Char::isDigit).take(2) }, label = { Text("День") }, singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !blocked, modifier = Modifier.weight(1f))
-                        OutlinedTextField(month, { month = it.filter(Char::isDigit).take(2) }, label = { Text("Месяц") }, singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !blocked, modifier = Modifier.weight(1f))
-                        OutlinedTextField(year, { year = it.filter(Char::isDigit).take(4) }, label = { Text("Год") }, singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !blocked, modifier = Modifier.weight(1.3f))
+                    Surface(onClick = { focus.clearFocus(); pickingDate = true }, enabled = !blocked,
+                        shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "День рождения: ${birthdayLabel(draft) ?: "не указан"}. Изменить" }) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("День рождения", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(birthdayLabel(draft) ?: "Выбрать дату", style = MaterialTheme.typography.bodyLarge)
+                            }
+                            LifetyIcon(LifetySymbol.Calendar, color = MaterialTheme.colorScheme.primary)
+                        }
                     }
                     Text("Год можно не указывать. День рождения появится в календаре каждый год.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (day.toIntOrNull() == 29 && month.toIntOrNull() == 2) Text("В невисокосные годы — 28 февраля.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (day.isNotEmpty() || month.isNotEmpty() || year.isNotEmpty()) TextButton(onClick = { day = ""; month = ""; year = "" }, enabled = !blocked) { Text("Убрать дату рождения") }
                 }
-                NoteField("Интересы", "Например, искусство и путешествия", interests, !blocked) { interests = it }
-                NoteField("Увлечения", "Что любит делать в свободное время", hobbies, !blocked) { hobbies = it }
-                NoteField("Идеи для подарков", "Пожелания, ссылки, размеры — всё, что пригодится", gifts, !blocked) { gifts = it }
+                PersonNoteListEditor("Интересы", "Интерес", "Добавить интерес", "Например, искусство", interests, !blocked) { interests = it }
+                PersonNoteListEditor("Увлечения", "Увлечение", "Добавить увлечение", "Например, плавание", hobbies, !blocked) { hobbies = it }
+                PersonNoteListEditor("Идеи для подарков", "Подарок", "Добавить идею", "Например, книга или ссылка", gifts, !blocked) { gifts = it }
             }
             (error ?: inputError?.takeIf { attempted })?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
@@ -122,30 +118,10 @@ internal fun PersonEditorSheet(initial: Person, isNew: Boolean, repository: Pers
         text = { Text("Карточка и день рождения в календаре будут удалены. Это действие нельзя отменить.") },
         confirmButton = { TextButton(onClick = { confirmDelete = false; write(deleting = true) }, enabled = !blocked) { Text("Удалить", color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Отмена") } })
-    if (pickingDate) {
-        val selected = runCatching { LocalDate(year.toIntOrNull() ?: 2000, month.toInt(), day.toInt()) }.getOrNull()
-        val picker = rememberDatePickerState(initialSelectedDateMillis = selected?.atStartOfDayIn(TimeZone.UTC)?.toEpochMilliseconds(), yearRange = 1..currentDay.year)
-        DatePickerDialog(onDismissRequest = { pickingDate = false },
-            confirmButton = { TextButton(enabled = picker.selectedDateMillis != null, onClick = {
-                picker.selectedDateMillis?.let { millis ->
-                    val date = localDate(millis, TimeZone.UTC)
-                    day = date.day.toString(); month = date.month.number.toString()
-                    if (year.isNotEmpty()) year = date.year.toString()
-                }
-                pickingDate = false
-            }) { Text("Готово") } },
-            dismissButton = { TextButton(onClick = { pickingDate = false }) { Text("Отмена") } }) {
-            Column {
-                Text("Выберите день и месяц. Если год известен, укажите его в карточке.", modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall)
-                DatePicker(picker)
-            }
-        }
-    }
-}
-
-@Composable
-private fun NoteField(label: String, hint: String, value: String, enabled: Boolean, onChange: (String) -> Unit) {
-    OutlinedTextField(value, { onChange(it.take(10_000)) }, label = { Text(label) }, placeholder = { Text(hint) },
-        modifier = Modifier.fillMaxWidth(), enabled = enabled, minLines = 2, maxLines = 6,
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+    if (pickingDate) BirthdayPickerDialog(
+        initial = if (draft.birthdayDay != null && draft.birthdayMonth != null) BirthdaySelection(draft.birthdayDay, draft.birthdayMonth, draft.birthYear) else null,
+        onConfirm = { selected ->
+            day = selected.day.toString(); month = selected.month.toString(); year = selected.year?.toString().orEmpty()
+            pickingDate = false
+        }, onDismiss = { pickingDate = false })
 }

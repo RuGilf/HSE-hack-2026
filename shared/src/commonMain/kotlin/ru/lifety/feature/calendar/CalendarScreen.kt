@@ -161,7 +161,7 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(person.fullName, style = MaterialTheme.typography.titleMedium)
                             Text(birthdayAgeLabel(person, selected), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
-                            if (person.giftIdeas.isNotBlank()) Text("Идеи подарков: ${person.giftIdeas}", maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            if (person.giftIdeas.isNotBlank()) Text("Идеи подарков: ${personNotePreview(person.giftIdeas)}", maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("Открыть карточку", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         }

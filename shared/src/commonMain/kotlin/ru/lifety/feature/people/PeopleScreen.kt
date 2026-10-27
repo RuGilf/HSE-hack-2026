@@ -78,9 +78,9 @@ fun PeopleScreen(modifier: Modifier = Modifier) {
                                         Text(if (date == currentDay) "Сегодня день рождения!" else "В календаре: ${formatDate(date)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     val preview = when {
-                                        person.giftIdeas.isNotBlank() -> "Подарки: ${person.giftIdeas}"
-                                        person.interests.isNotBlank() -> person.interests
-                                        else -> person.hobbies
+                                        person.giftIdeas.isNotBlank() -> "Подарки: ${personNotePreview(person.giftIdeas)}"
+                                        person.interests.isNotBlank() -> personNotePreview(person.interests)
+                                        else -> personNotePreview(person.hobbies)
                                     }
                                     if (preview.isNotBlank()) Text(preview, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
