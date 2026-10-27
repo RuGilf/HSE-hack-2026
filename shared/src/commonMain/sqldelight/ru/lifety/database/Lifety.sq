@@ -1,7 +1,7 @@
 import kotlin.Boolean;
 import kotlin.Int;
 
--- Schema version 2: category overrides/custom definitions; migration 1.sqm preserves expenses.
+-- Schema version 3: people; migrations preserve all existing data.
 CREATE TABLE task (
     id TEXT NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,
@@ -68,3 +68,24 @@ SELECT * FROM healthSnapshot ORDER BY timestamp DESC;
 upsertHealth:
 INSERT OR REPLACE INTO healthSnapshot(timestamp, sleepMinutes, steps)
 VALUES (?, ?, ?);
+
+CREATE TABLE person (
+    id TEXT NOT NULL PRIMARY KEY,
+    fullName TEXT NOT NULL,
+    birthdayMonth INTEGER AS Int,
+    birthdayDay INTEGER AS Int,
+    birthYear INTEGER AS Int,
+    interests TEXT NOT NULL,
+    hobbies TEXT NOT NULL,
+    giftIdeas TEXT NOT NULL
+);
+
+selectPeople:
+SELECT * FROM person ORDER BY fullName COLLATE NOCASE ASC, id ASC;
+
+upsertPerson:
+INSERT OR REPLACE INTO person(id, fullName, birthdayMonth, birthdayDay, birthYear, interests, hobbies, giftIdeas)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deletePerson:
+DELETE FROM person WHERE id = ?;

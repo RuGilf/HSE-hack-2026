@@ -12,6 +12,9 @@ import ru.lifety.core.model.Expense
 import ru.lifety.core.model.ExpenseCategory
 import ru.lifety.core.repository.ExpenseCategoryRepository
 import ru.lifety.core.model.HealthSnapshot
+import ru.lifety.core.model.Person
+import ru.lifety.core.repository.PersonRepository
+import ru.lifety.core.model.personValidationError
 import ru.lifety.core.model.Task
 import ru.lifety.core.repository.ExpenseRepository
 import ru.lifety.core.repository.HealthRepository
@@ -91,4 +94,22 @@ class SqlDelightHealthRepository(
             snapshots.forEach { queries.upsertHealth(it.timestamp, it.sleepMinutes, it.steps) }
         }
     }
+}
+
+class SqlDelightPersonRepository(
+    database: LifetyDatabase,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : PersonRepository {
+    private val queries = database.lifetyQueries
+
+    override fun observeAll(): Flow<List<Person>> = queries.selectPeople(::Person).asFlow().mapToList(dispatcher)
+
+    override suspend fun upsert(person: Person) = withContext(dispatcher) {
+        require(personValidationError(person) == null) { personValidationError(person) ?: "Invalid person" }
+        queries.upsertPerson(person.id, person.fullName.trim(), person.birthdayMonth, person.birthdayDay,
+            person.birthYear, person.interests.trim(), person.hobbies.trim(), person.giftIdeas.trim())
+        Unit
+    }
+
+    override suspend fun delete(id: String) = withContext(dispatcher) { queries.deletePerson(id); Unit }
 }

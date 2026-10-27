@@ -26,25 +26,30 @@ import androidx.compose.ui.unit.dp
 import ru.lifety.core.ui.LifetyMotion
 import ru.lifety.feature.calendar.CalendarScreen
 import ru.lifety.feature.tasks.TasksScreen
+import ru.lifety.feature.people.PeopleScreen
 
-/** One primary Plan destination, with independently saved task and calendar UI state. */
+/** One primary Plan destination, with independently saved day, calendar and people UI state. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlanScreen(initialCalendar: Boolean = false, modifier: Modifier = Modifier) {
-    var calendar by rememberSaveable { mutableStateOf(initialCalendar) }
+    var tab by rememberSaveable { mutableStateOf(if (initialCalendar) 1 else 0) }
     val stateHolder = rememberSaveableStateHolder()
     Column(modifier.fillMaxSize()) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            listOf("День", "Календарь").forEachIndexed { index, title ->
-                SegmentedButton(selected = calendar == (index == 1), onClick = { calendar = index == 1 },
-                    shape = SegmentedButtonDefaults.itemShape(index, 2), label = { Text(title) })
+            listOf("День", "Календарь", "Люди").forEachIndexed { index, title ->
+                SegmentedButton(selected = tab == index, onClick = { tab = index },
+                    shape = SegmentedButtonDefaults.itemShape(index, 3), label = { Text(title) })
             }
         }
-        AnimatedContent(calendar, modifier = Modifier.weight(1f), label = "planTab",
-            transitionSpec = { fadeIn(tween(LifetyMotion.Standard)) togetherWith fadeOut(tween(LifetyMotion.Quick)) }) { showCalendar ->
-            stateHolder.SaveableStateProvider(if (showCalendar) "calendar" else "tasks") {
+        AnimatedContent(tab, modifier = Modifier.weight(1f), label = "planTab",
+            transitionSpec = { fadeIn(tween(LifetyMotion.Standard)) togetherWith fadeOut(tween(LifetyMotion.Quick)) }) { selectedTab ->
+            stateHolder.SaveableStateProvider(listOf("tasks", "calendar", "people")[selectedTab]) {
                 Box(Modifier.fillMaxSize()) {
-                    if (showCalendar) CalendarScreen(Modifier.fillMaxSize()) else TasksScreen(Modifier.fillMaxSize())
+                    when (selectedTab) {
+                        1 -> CalendarScreen(Modifier.fillMaxSize())
+                        2 -> PeopleScreen(Modifier.fillMaxSize())
+                        else -> TasksScreen(Modifier.fillMaxSize())
+                    }
                 }
             }
         }

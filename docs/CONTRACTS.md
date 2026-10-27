@@ -503,3 +503,54 @@ Task, repository interfaces, SQL и screen entry signatures сохранены.
   прозрачный UIView. Android NavigationBar остаётся в Scaffold. Internal
   `core/ui/LocalBottomNavigationInset` равен высоте overlay только на iOS; функции
   используют его для хвоста списка, FAB и composer, не обрезая фон под стеклом.
+
+## Люди и дни рождения — 27 октября 2026
+
+Все новые Kotlin-файлы ниже находятся в `shared/src/commonMain/kotlin/ru/lifety/`.
+
+```kotlin
+// core/model/Person.kt — ru.lifety.core.model
+@Serializable
+data class Person(
+    val id: String,
+    val fullName: String,
+    val birthdayMonth: Int? = null,
+    val birthdayDay: Int? = null,
+    val birthYear: Int? = null,
+    val interests: String = "",
+    val hobbies: String = "",
+    val giftIdeas: String = "",
+)
+// core/repository/PersonRepository.kt — ru.lifety.core.repository
+interface PersonRepository {
+    fun observeAll(): Flow<List<Person>>
+    suspend fun upsert(person: Person)
+    suspend fun delete(id: String)
+}
+```
+
+- `Repositories.people: PersonRepository? = null` — дополнительное поле в конце
+  конструктора, прежние вызовы совместимы. `AppContainer` передаёт один
+  `database.SqlDelightPersonRepository`. Preview без него показывает явное отсутствие хранилища.
+- `observeAll` выдаёт снимок и последующие изменения. SQL: `fullName COLLATE NOCASE,
+  id ASC`; UI отдельно сортирует по ближайшему дню рождения/имени. SQLite NOCASE
+  не обещает русскую локализованную сортировку. Записи на IO, upsert заменяет строку,
+  отсутствующий delete успешен. Ошибка/отмена доходят до вызывающего кода.
+- `core/model/PersonValidation.kt`: `personValidationError(person, currentDate)`;
+  модель хранит гражданскую дату, а не timestamp. День/месяц либо оба null, либо
+  корректная дата; год необязателен. Подробности — [PEOPLE.md](PEOPLE.md).
+- **Текущая schema v3**: таблицы `task`, `expense`, `healthSnapshot`,
+  `expenseCategory`, `person`. `2.sqm` добавляет `person`, `1.sqm` сохранён.
+  Adapter для nullable Int подключён в `createDatabase`.
+- `feature/people/PeopleScreen.kt`, пакет `ru.lifety.feature.people`:
+  `@Composable fun PeopleScreen(modifier: Modifier = Modifier)`.
+  `PeopleViewModel.state: StateFlow<PeopleState>`; редактор internal
+  `PersonEditorSheet(initial, isNew, repository, onDismiss)` используется и календарём.
+- Вход **План → Люди**, третья внутренняя вкладка. Пять основных разделов и
+  публичные navigation/Task/Expense/Health контракты сохранены. Календарь получает
+  `.people` из общего DI, не обращается напрямую к SQL.
+- `feature/people/PeopleDates.kt`: `birthdayInYear`, `nextBirthday`,
+  `birthdaysOnDate`, `birthdayLabel`, `birthdayAgeLabel`. Ежегодная проекция
+  без Task-копий; 29 февраля → 28 февраля в невисокосный год.
+  Редактирование/удаление человека сразу отражается в календаре.
+- Нет новых разрешений, внешнего календаря или доступа AI к карточкам людей.

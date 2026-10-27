@@ -9,6 +9,7 @@ import ru.lifety.database.SqlDelightExpenseRepository
 import ru.lifety.database.SqlDelightHealthRepository
 import ru.lifety.database.SqlDelightTaskRepository
 import ru.lifety.database.SqlDelightExpenseCategoryRepository
+import ru.lifety.database.SqlDelightPersonRepository
 import ru.lifety.database.createDatabase
 
 /** One owner for the database connection and all repositories. Construct off the UI thread. */
@@ -22,6 +23,7 @@ class AppContainer(
         expenses = SqlDelightExpenseRepository(database, dispatcher),
         health = SqlDelightHealthRepository(database, dispatcher),
         expenseCategories = SqlDelightExpenseCategoryRepository(database, dispatcher),
+        people = SqlDelightPersonRepository(database, dispatcher),
     )
 
     override fun close() { driver.close() }

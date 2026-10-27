@@ -1,0 +1,10 @@
+CREATE TABLE person (
+    id TEXT NOT NULL PRIMARY KEY,
+    fullName TEXT NOT NULL,
+    birthdayMonth INTEGER,
+    birthdayDay INTEGER,
+    birthYear INTEGER,
+    interests TEXT NOT NULL,
+    hobbies TEXT NOT NULL,
+    giftIdeas TEXT NOT NULL
+);

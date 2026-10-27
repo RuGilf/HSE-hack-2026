@@ -21,7 +21,7 @@ class DatabaseSchemaTest {
                     QueryResult.Value(names)
                 }, 0,
             ).value
-            assertEquals(listOf("expense", "expenseCategory", "healthSnapshot", "task"), tables)
+            assertEquals(listOf("expense", "expenseCategory", "healthSnapshot", "person", "task"), tables)
 
             driver.execute(null, "INSERT INTO task VALUES ('t1', 'Task', NULL, NULL, 0)", 0)
             driver.execute(null, "INSERT INTO expense VALUES ('e1', 9007199254740993, 'RUB', 'Shop', 'other', 1792886400000, 'manual')", 0)
