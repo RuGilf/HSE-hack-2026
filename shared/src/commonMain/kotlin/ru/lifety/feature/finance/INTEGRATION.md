@@ -96,3 +96,16 @@ runtime were not checked. The iOS date adapter factory call was corrected after 
   identifier parser. This intentionally small template set is not universal bank support.
 - Durable budgets need a future Core preferences contract; no incompatible schema was added.
 - Date input supports 1900–9999. Receipt scanning/fiscal API is intentionally absent.
+## Category colors — 27 October 2026
+
+Eight stable category accents are shared by Android and iOS: chart bars/legend,
+transaction markers, editor chips and category suggestions. Tokens live in
+`core/ui/LifetyDesign.kt`, ID mapping and decorative components in
+`FinanceCategoryStyle.kt`. Unknown IDs use the neutral Other accent and retain
+their original labels. Amounts, labels, category IDs and persistence are unchanged.
+
+Android full build/lint, host tests (155 passed, 6 live LLM skips), native iOS tests
+(61 passed) and Xcode simulator build passed. On the isolated iPhone 17 QA
+simulator, checked all eight editor accents, saving a synthetic 250 RUB Transport
+expense, blue/gray category bars, matching transaction markers and the selected
+Transport chip after reopening the editor. Physical devices were not tested.

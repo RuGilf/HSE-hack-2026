@@ -293,6 +293,7 @@ private fun ExpenseRow(expense: Expense, enabled: Boolean, onEdit: () -> Unit, o
         modifier = Modifier.clickable(enabled = enabled, onClick = onEdit),
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
         headlineContent = { Text(expense.merchant, maxLines = 2) },
+        leadingContent = { CategoryMarker(expense.category) },
         supportingContent = {
             Text(categoryTitle(expense.category) + when {
                 expense.source == "demo-notification" -> " · ДЕМО"

@@ -15,6 +15,18 @@ object LifetyColors {
     val TextSecondary = Color(0xFF9BAA9F)
     val Outline = Color(0xFF34473A)
     val Error = Color(0xFFFF817D)
+
+    // Stable chart/category accents. Amounts and labels keep the normal text color.
+    object ExpenseCategory {
+        val Food = Color(0xFF5CDF85)
+        val Transport = Color(0xFF73B7FF)
+        val Shopping = Color(0xFFD5A1FF)
+        val Bills = Color(0xFFF6C76B)
+        val Health = Color(0xFFFF9BA8)
+        val Leisure = Color(0xFF60D5D2)
+        val Education = Color(0xFFB6C5FF)
+        val Other = Color(0xFFA8B5AC)
+    }
 }
 
 object LifetySpacing {

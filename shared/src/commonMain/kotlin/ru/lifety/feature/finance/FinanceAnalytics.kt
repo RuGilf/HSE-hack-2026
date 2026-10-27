@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -43,13 +44,16 @@ internal fun CategoryChart(summary: ExpenseSummary, currency: String) {
             Text("Расходы по категориям", style = MaterialTheme.typography.titleMedium)
             summary.byCategory.entries.sortedByDescending { it.value }.forEach { (category, amount) ->
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CategoryMarker(category)
                         Text(categoryTitle(category), Modifier.weight(1f))
                         Text(formatMoney(amount, currency))
                     }
                     val ratio by animateFloatAsState(expenseShare(amount, summary.totalMinor), tween(LifetyMotion.Emphasis), label = "categoryProgress")
                     LinearProgressIndicator(progress = { ratio },
-                        modifier = Modifier.fillMaxWidth().height(8.dp), trackColor = MaterialTheme.colorScheme.outlineVariant)
+                        modifier = Modifier.fillMaxWidth().height(8.dp), color = categoryColor(category),
+                        trackColor = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }

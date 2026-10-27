@@ -80,12 +80,13 @@ internal fun ExpenseEditorDialog(
                 val suggestedCategory = inferFinanceCategory(merchant)
                 if (category == "other" && suggestedCategory != "other") {
                     SuggestionChip(onClick = { category = suggestedCategory }, enabled = !locked,
+                        icon = { CategoryMarker(suggestedCategory) },
                         label = { Text("Предложение: ${categoryTitle(suggestedCategory)}") })
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     (financeCategories.keys + category).distinct().forEach { key ->
-                        FilterChip(selected = category == key, enabled = !locked,
-                            onClick = { category = key }, label = { Text(categoryTitle(key)) })
+                        CategoryFilterChip(key, selected = category == key, enabled = !locked,
+                            onClick = { category = key })
                     }
                 }
                 LifetyDateField("Дата расхода", date, { date = it }, enabled = !locked)
