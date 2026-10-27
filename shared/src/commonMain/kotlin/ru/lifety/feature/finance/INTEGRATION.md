@@ -109,3 +109,12 @@ Android full build/lint, host tests (155 passed, 6 live LLM skips), native iOS t
 simulator, checked all eight editor accents, saving a synthetic 250 RUB Transport
 expense, blue/gray category bars, matching transaction markers and the selected
 Transport chip after reopening the editor. Physical devices were not tested.
+
+## Category editor — 27 October 2026
+
+Finance → Categories supports persistent names, palette/HEX colors, custom IDs,
+archive and restore. `Repositories.expenseCategories` is wired by Core; schema v2
+adds `expenseCategory` via `1.sqm`. Expense.category remains a stable ID, including
+all existing built-in and legacy values. No expenses are rewritten on rename or
+archive. Composition-local definitions update charts, rows and editor chips.
+Full behavior, migration, checks and limitations: `docs/EXPENSE_CATEGORIES.md`.

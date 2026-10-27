@@ -1,9 +1,7 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 package ru.lifety.app
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitView
@@ -13,12 +11,12 @@ import androidx.compose.ui.unit.dp
 import platform.darwin.NSObject
 import platform.UIKit.*
 import ru.lifety.app.navigation.AppDestination
+import ru.lifety.core.ui.LocalBottomNavigationInset
 
 /** UIKit supplies SF Symbols, VoiceOver selection and the native tab-bar appearance. */
 @Composable
 internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (AppDestination) -> Unit) {
     val currentSelect by rememberUpdatedState(onSelect)
-    val background = MaterialTheme.colorScheme.background
     val delegate = remember { object : NSObject(), UITabBarDelegateProtocol {
         override fun tabBar(tabBar: UITabBar, didSelectItem: UITabBarItem) {
             primarySections.getOrNull(didSelectItem.tag.toInt())?.let { currentSelect(it) }
@@ -30,7 +28,7 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
             accessibilityLabel = destination.title
         }
     } }
-    Box(Modifier.fillMaxWidth().background(background)) {
+    Box(Modifier.fillMaxWidth()) {
         UIKitView(factory = {
             UITabBar().apply {
                 this.delegate = delegate
@@ -41,13 +39,12 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
                 standardAppearance = appearance
                 scrollEdgeAppearance = appearance
                 overrideUserInterfaceStyle = UIUserInterfaceStyle.UIUserInterfaceStyleDark
+                backgroundColor = UIColor.clearColor
+                opaque = false
             }
-        }, modifier = Modifier.fillMaxWidth().height(49.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-            properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.NonCooperative, isNativeAccessibilityEnabled = true), update = { bar ->
-            // The standalone bar's transparent margins otherwise expose a black UIKit
-            // backing strip instead of the Compose screen behind its floating material.
-            bar.backgroundColor = UIColor(red = background.red.toDouble(), green = background.green.toDouble(),
-                blue = background.blue.toDouble(), alpha = 1.0)
+        }, modifier = Modifier.fillMaxWidth().height(LocalBottomNavigationInset.current),
+            properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.NonCooperative,
+                isNativeAccessibilityEnabled = true, placedAsOverlay = true), update = { bar ->
             bar.selectedItem = items[primarySections.indexOf(selected).coerceAtLeast(0)]
         })
     }

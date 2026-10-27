@@ -22,6 +22,7 @@ import ru.lifety.core.model.Expense
 import ru.lifety.core.ui.isIos
 import ru.lifety.core.ui.LifetyMotion
 import ru.lifety.core.ui.LocalRepositories
+import ru.lifety.core.ui.LocalBottomNavigationInset
 import ru.lifety.core.ui.LifetyDateField
 import ru.lifety.core.ui.LifetyEmptyState
 import ru.lifety.core.ui.LifetyEmotion
@@ -37,15 +38,27 @@ fun FinanceScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val controller = remember(repository, scope) { repository?.let { FinanceController(it, scope) } }
     val state = controller?.state?.collectAsState()?.value ?: FinanceUiState(loading = false)
-    FinanceContent(
-        state = state,
-        storageConnected = repository != null,
-        onSave = { controller?.save(it) ?: false },
-        onDelete = { controller?.delete(it) ?: false },
-        onRetry = { controller?.retry() },
-        onConfirm = { controller?.confirmNotification(it) ?: false },
-        modifier = modifier,
-    )
+    val categoryRepository = LocalRepositories.current?.expenseCategories
+    val categoryController = remember(categoryRepository, scope) { categoryRepository?.let { FinanceCategoryController(it, scope) } }
+    val categoryState = categoryController?.state?.collectAsState()?.value ?: CategoryUiState(loading = false)
+    val categories = remember(categoryState.categories, state.expenses) {
+        resolveExpenseCategories(categoryState.categories, state.expenses.map { it.category })
+    }
+    var showCategories by rememberSaveable { mutableStateOf(false) }
+    CompositionLocalProvider(LocalExpenseCategories provides categories) {
+        FinanceContent(
+            state = state,
+            storageConnected = repository != null,
+            onSave = { controller?.save(it) ?: false },
+            onDelete = { controller?.delete(it) ?: false },
+            onRetry = { controller?.retry() },
+            onConfirm = { controller?.confirmNotification(it) ?: false },
+            modifier = modifier,
+            onManageCategories = if (categoryController != null) ({ showCategories = true }) else null,
+        )
+        if (showCategories && categoryController != null) CategoryManagerSheet(categoryState.copy(categories = categories),
+            onSave = categoryController::save, onRetry = categoryController::retry, onDismiss = { showCategories = false })
+    }
 }
 
 /** Explicit state and callbacks also allow previews/tests without changing Core DI. */
@@ -58,8 +71,10 @@ fun FinanceContent(
     modifier: Modifier = Modifier,
     storageConnected: Boolean = true,
     onConfirm: suspend (Expense) -> Boolean = onSave,
+    onManageCategories: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
+    val bottomInset = LocalBottomNavigationInset.current
     val today = localFinanceDate(financeNow())
     var currency by rememberSaveable { mutableStateOf("RUB") }
     var fromText by rememberSaveable { mutableStateOf(today.copy(day = 1).toString()) }
@@ -112,13 +127,13 @@ fun FinanceContent(
                 if (!state.loading && !state.saving) { editing = null; suggestionId = null; showEditor = true }
             }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = MaterialTheme.shapes.large,
-                modifier = Modifier.semantics { contentDescription = "Добавить расход" }) {
+                modifier = Modifier.padding(bottom = bottomInset).semantics { contentDescription = "Добавить расход" }) {
                 LifetyIcon(LifetySymbol.Plus)
             }
         }) { padding ->
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp + bottomInset),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (!storageConnected) item {
@@ -129,6 +144,13 @@ fun FinanceContent(
             TextButton(onClick = onRetry, enabled = !state.saving) { Text("Повторить загрузку") }
         }
         if (state.loading || state.saving) item { LinearProgressIndicator(Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.outlineVariant) }
+        if (onManageCategories != null) item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onManageCategories, enabled = !state.saving) {
+                    LifetyIcon(LifetySymbol.Settings, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Категории")
+                }
+            }
+        }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FinancePeriod.entries.forEach { period ->
@@ -295,7 +317,7 @@ private fun ExpenseRow(expense: Expense, enabled: Boolean, onEdit: () -> Unit, o
         headlineContent = { Text(expense.merchant, maxLines = 2) },
         leadingContent = { CategoryMarker(expense.category) },
         supportingContent = {
-            Text(categoryTitle(expense.category) + when {
+            Text(categoryDisplayName(expense.category) + when {
                 expense.source == "demo-notification" -> " · ДЕМО"
                 expense.source.startsWith("notification:") -> " · Из уведомления"
                 else -> ""

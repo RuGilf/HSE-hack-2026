@@ -8,10 +8,9 @@ SwiftUI `LifetyApp.swift` размещает общий Compose UIViewController
 Маршруты и состояние экранов остаются в общей Compose Navigation. Отдельного
 SwiftUI TabView и второй независимой системы маршрутов нет.
 
-Исправлен цвет фоновой области UITabBar: до изменения вокруг плавающего
-материала была чёрная полоса с резкой границей на фоне экрана. Теперь UIKit и
-Compose используют один `MaterialTheme.colorScheme.background`; системные
-материал, SF Symbols, размер и подсветка выбранного пункта сохранены.
+26 октября фон UITabBar был приведён к фону Compose, но эта правка цвета
+не обеспечивала прозрачность native view. Окончательное исправление режима
+встраивания описано в разделе от 27 октября ниже.
 
 Дополнительно фон SwiftUI host растянут до краёв через `ZStack` и
 `Color("LaunchBackground").ignoresSafeArea()`. View встроенного Compose controller
@@ -53,3 +52,19 @@ Xcode build и Android debug/release/lint успешны. Host tests: 155 passed
 6 live LLM tests skipped без credentials. Kotlin iOS tests: 61 passed.
 Новые тесты для изменения цвета не добавлялись; визуальная правка проверена
 в интерфейсе на обоих устройствах.
+
+## 27 октября: прозрачный overlay
+
+UITabBar теперь использует `UIKitInteropProperties(placedAsOverlay = true)`:
+Compose не вырезает прямоугольник под UIKit. Фон UIView прозрачный, фоновой Box
+под ним нет. Панель вынесена из bottomBar слота Scaffold и накладывается на
+полное содержимое. Последний элемент каждого списка, FAB и поле чата учитывают
+`LocalBottomNavigationInset`, поэтому их можно прокрутить/разместить выше меню.
+Android сохраняет прежний Material NavigationBar с нулевым дополнительным inset.
+
+В обновлённом iPhone 17 QA simulator проверены Finance portrait/landscape,
+содержимое под системным стеклом без прямоугольной отсечки, пять разделов,
+Plan FAB, Health, composer Assistant и формы поверх панели. Xcode build,
+Android build/lint, 163 host tests и 65 native Kotlin iOS tests успешны;
+6 live LLM tests пропущены без ключей. iPad и физический телефон в этой
+итерации не перепроверялись. Детали категорий — [EXPENSE_CATEGORIES.md](EXPENSE_CATEGORIES.md).

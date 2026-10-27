@@ -33,7 +33,9 @@ internal fun ExpenseEditorDialog(
     var merchant by rememberSaveable { mutableStateOf(initial?.merchant ?: "") }
     var amount by rememberSaveable { mutableStateOf(initial?.let { minorAmountInput(it.amountMinor) } ?: "") }
     var currency by rememberSaveable { mutableStateOf(initial?.currency ?: "RUB") }
-    var category by rememberSaveable { mutableStateOf(initial?.category ?: "other") }
+    val categories = LocalExpenseCategories.current
+    var category by rememberSaveable { mutableStateOf(initial?.category ?: categories.firstOrNull { it.id == "other" && !it.archived }?.id
+        ?: categories.firstOrNull { !it.archived }?.id ?: "other") }
     var date by rememberSaveable { mutableStateOf(localFinanceDate(initial?.timestamp ?: financeNow()).toString()) }
     var attempted by remember { mutableStateOf(false) }
     var submitting by remember { mutableStateOf(false) }
@@ -78,13 +80,13 @@ internal fun ExpenseEditorDialog(
                     isError = attempted && merchant.isBlank(), enabled = !locked)
                 Text("Категория", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val suggestedCategory = inferFinanceCategory(merchant)
-                if (category == "other" && suggestedCategory != "other") {
+                if (category == "other" && suggestedCategory != "other" && categories.any { it.id == suggestedCategory && !it.archived }) {
                     SuggestionChip(onClick = { category = suggestedCategory }, enabled = !locked,
                         icon = { CategoryMarker(suggestedCategory) },
-                        label = { Text("Предложение: ${categoryTitle(suggestedCategory)}") })
+                        label = { Text("Предложение: ${categoryDisplayName(suggestedCategory)}") })
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    (financeCategories.keys + category).distinct().forEach { key ->
+                    (categories.filterNot { it.archived }.map { it.id } + category).distinct().forEach { key ->
                         CategoryFilterChip(key, selected = category == key, enabled = !locked,
                             onClick = { category = key })
                     }

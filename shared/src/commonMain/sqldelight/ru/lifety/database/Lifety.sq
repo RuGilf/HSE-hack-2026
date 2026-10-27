@@ -1,7 +1,7 @@
 import kotlin.Boolean;
 import kotlin.Int;
 
--- Schema version 1: query additions do not change the on-disk schema.
+-- Schema version 2: category overrides/custom definitions; migration 1.sqm preserves expenses.
 CREATE TABLE task (
     id TEXT NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,
@@ -25,6 +25,19 @@ CREATE TABLE healthSnapshot (
     sleepMinutes INTEGER AS Int,
     steps INTEGER AS Int
 );
+
+CREATE TABLE expenseCategory (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    colorHex TEXT NOT NULL,
+    archived INTEGER AS Boolean NOT NULL DEFAULT 0
+);
+
+selectExpenseCategories:
+SELECT * FROM expenseCategory ORDER BY id ASC;
+
+upsertExpenseCategory:
+INSERT OR REPLACE INTO expenseCategory(id, name, colorHex, archived) VALUES (?, ?, ?, ?);
 
 selectTasks:
 SELECT * FROM task ORDER BY id ASC;

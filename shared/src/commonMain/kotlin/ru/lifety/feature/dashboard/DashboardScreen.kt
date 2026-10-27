@@ -31,7 +31,8 @@ fun DashboardScreen(modifier: Modifier = Modifier) {
             if (summary.today.isEmpty()) 0f else summary.completed.toFloat() / summary.today.size,
             tween(LifetyMotion.Emphasis), label = "dayProgress",
         )
-        LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp,
+            bottom = 16.dp + ru.lifety.core.ui.LocalBottomNavigationInset.current), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { Text(state.date.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (repositories == null) item { OverviewCard("Нет доступа к хранилищу", "Попробуйте открыть приложение ещё раз.") }
             if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.outlineVariant) }

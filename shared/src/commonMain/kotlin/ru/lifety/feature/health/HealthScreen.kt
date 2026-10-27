@@ -61,8 +61,10 @@ fun HealthScreen(modifier: Modifier = Modifier) {
                 snackbar.showSnackbar("Запись сохранена в истории")
             }
         }
-        Scaffold(modifier = modifier, contentWindowInsets = WindowInsets(0, 0, 0, 0), snackbarHost = { SnackbarHost(snackbar) }) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        val bottomInset = ru.lifety.core.ui.LocalBottomNavigationInset.current
+        Scaffold(modifier = modifier, contentWindowInsets = WindowInsets(0, 0, 0, 0), snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = bottomInset)) }) { padding ->
+            LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp,
+                bottom = 16.dp + bottomInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item {
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         HealthPeriod.entries.forEachIndexed { index, option ->

@@ -31,6 +31,7 @@ import kotlin.time.Clock
 @Composable
 fun TasksScreen(modifier: Modifier = Modifier) {
     val repository = LocalRepositories.current?.tasks
+    val bottomInset = LocalBottomNavigationInset.current
     if (repository == null) { PlaceholderScreen("Задачи · хранилище не подключено", modifier); return }
     val planner = LocalPlannerNavigation.current
     val model = viewModel { TaskListViewModel(repository) }
@@ -57,10 +58,10 @@ fun TasksScreen(modifier: Modifier = Modifier) {
         planner?.createTask(scheduledAt)
     }
     Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbar) }, floatingActionButton = {
+        snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = bottomInset)) }, floatingActionButton = {
             if (state.tasks.isNotEmpty()) FloatingActionButton(onClick = ::create,
                 containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = MaterialTheme.shapes.large, modifier = Modifier.semantics { contentDescription = "Добавить дело" }) { LifetyIcon(LifetySymbol.Plus) }
+                shape = MaterialTheme.shapes.large, modifier = Modifier.padding(bottom = bottomInset).semantics { contentDescription = "Добавить дело" }) { LifetyIcon(LifetySymbol.Plus) }
         }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -101,7 +102,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                         }
                         if (filter != TaskFilter.ACTIVE) add("Завершённые" to plan.completed)
                     }.filter { it.second.isNotEmpty() }
-                    LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 100.dp)) {
+                    LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 100.dp + bottomInset)) {
                         if (sections.all { it.second.isEmpty() }) item {
                             LifetyEmptyState(title = if (filter == TaskFilter.COMPLETED) "Пока нет завершённых дел" else "День свободен",
                                 message = if (filter == TaskFilter.COMPLETED) "Здесь будут завершённые дела выбранного периода. Все записи доступны через «Все даты»."

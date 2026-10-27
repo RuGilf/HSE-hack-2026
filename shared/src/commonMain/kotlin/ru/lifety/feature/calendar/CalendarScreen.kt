@@ -60,12 +60,14 @@ import ru.lifety.core.ui.LifetyEmotion
 import ru.lifety.core.ui.LifetyIcon
 import ru.lifety.core.ui.LifetySymbol
 import ru.lifety.core.ui.LocalRepositories
+import ru.lifety.core.ui.LocalBottomNavigationInset
 import ru.lifety.core.ui.PlaceholderScreen
 import ru.lifety.core.ui.TaskCard
 
 @Composable
 fun CalendarScreen(modifier: Modifier = Modifier) {
     val repository = LocalRepositories.current?.tasks
+    val bottomInset = LocalBottomNavigationInset.current
     if (repository == null) { PlaceholderScreen("Календарь · хранилище не подключено", modifier); return }
     val planner = LocalPlannerNavigation.current
     val model = viewModel { TaskListViewModel(repository) }
@@ -88,13 +90,13 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
     val selectedTasks = remember(state.tasks, selected, zone) { tasksOnDate(state.tasks, selected, zone) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.actionError) { state.actionError?.let { snackbar.showSnackbar(it); model.dismissError() } }
-    Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0), snackbarHost = { SnackbarHost(snackbar) },
+    Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0), snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = bottomInset)) },
         floatingActionButton = { FloatingActionButton(onClick = { planner?.createTask(selected.atTime(9, 0).toInstant(zone).toEpochMilliseconds()) },
             shape = MaterialTheme.shapes.large, containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.semantics { contentDescription = "Добавить задачу на выбранный день" }) { LifetyIcon(LifetySymbol.Plus) } }) { padding ->
+            modifier = Modifier.padding(bottom = bottomInset).semantics { contentDescription = "Добавить задачу на выбранный день" }) { LifetyIcon(LifetySymbol.Plus) } }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 100.dp)) {
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 100.dp + bottomInset)) {
             item {
                 Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

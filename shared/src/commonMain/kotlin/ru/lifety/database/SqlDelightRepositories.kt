@@ -9,6 +9,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import ru.lifety.core.model.Expense
+import ru.lifety.core.model.ExpenseCategory
+import ru.lifety.core.repository.ExpenseCategoryRepository
 import ru.lifety.core.model.HealthSnapshot
 import ru.lifety.core.model.Task
 import ru.lifety.core.repository.ExpenseRepository
@@ -30,6 +32,24 @@ class SqlDelightTaskRepository(
     }
 
     override suspend fun delete(id: String) = withContext(dispatcher) { queries.deleteTask(id); Unit }
+}
+
+class SqlDelightExpenseCategoryRepository(
+    database: LifetyDatabase,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : ExpenseCategoryRepository {
+    private val queries = database.lifetyQueries
+
+    override fun observeAll(): Flow<List<ExpenseCategory>> = queries.selectExpenseCategories(::ExpenseCategory)
+        .asFlow().mapToList(dispatcher)
+
+    override suspend fun upsert(category: ExpenseCategory) = withContext(dispatcher) {
+        require(category.id.isNotBlank() && category.id.length <= 80)
+        require(category.name.isNotBlank() && category.name.length <= 40)
+        require(Regex("#[0-9A-Fa-f]{6}").matches(category.colorHex))
+        queries.upsertExpenseCategory(category.id, category.name.trim(), category.colorHex.uppercase(), category.archived)
+        Unit
+    }
 }
 
 class SqlDelightExpenseRepository(

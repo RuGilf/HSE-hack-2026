@@ -5,4 +5,5 @@ data class Repositories(
     val tasks: TaskRepository,
     val expenses: ExpenseRepository,
     val health: HealthRepository,
+    val expenseCategories: ExpenseCategoryRepository? = null,
 )

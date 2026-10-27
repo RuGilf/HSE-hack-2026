@@ -47,7 +47,7 @@ internal fun CategoryChart(summary: ExpenseSummary, currency: String) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         CategoryMarker(category)
-                        Text(categoryTitle(category), Modifier.weight(1f))
+                        Text(categoryDisplayName(category), Modifier.weight(1f))
                         Text(formatMoney(amount, currency))
                     }
                     val ratio by animateFloatAsState(expenseShare(amount, summary.totalMinor), tween(LifetyMotion.Emphasis), label = "categoryProgress")

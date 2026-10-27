@@ -480,3 +480,26 @@ Task, repository interfaces, SQL и screen entry signatures сохранены.
 проверяет scheduledAt <= deadlineAt для активного дела с будущим дедлайном.
 Просроченное дело можно перепланировать без удаления исходного срока. Репозитории не меняют
 старые данные и не получают новой валидации. Поведение — `docs/DAY_PLANNER.md`.
+
+## Редактор категорий / iOS overlay — 27 октября 2026
+
+- `core/model/ExpenseCategory.kt`, пакет `ru.lifety.core.model`:
+  `@Serializable data class ExpenseCategory(id: String, name: String, colorHex: String, archived: Boolean = false)`.
+- `core/repository/ExpenseCategoryRepository.kt`: `observeAll(): Flow<List<ExpenseCategory>>`,
+  `suspend upsert(category: ExpenseCategory)`. Выдаёт пользовательские определения
+  и переопределения стандартных категорий, включая скрытые; UI дополняет defaults.
+- `Repositories` получил `expenseCategories: ExpenseCategoryRepository? = null` в
+  конце конструктора, сохраняя прежние вызовы. Production DI всегда передаёт
+  `SqlDelightExpenseCategoryRepository`; preview без репозитория не предлагает запись.
+- Schema v2, migration `1.sqm`: только новая таблица `expenseCategory`. Expense и
+  остальные модели/методы репозиториев/route IDs не меняются. `Expense.category`
+  остаётся ID; название и цвет меняются без перезаписи расходов.
+- Built-in IDs прежние; новые — `custom:<UUID>`. Архивирование сохраняет определение,
+  но исключает его из выбора новых расходов. Скрытую категорию старого расхода
+  по-прежнему можно оставить в редакторе. Есть возврат; последнюю видимую скрыть нельзя.
+- `FinanceScreen(modifier)` остаётся прежним. `FinanceContent` получил optional
+  `onManageCategories: (() -> Unit)? = null`. Контроллер/компоненты категорий internal.
+- iOS UITabBar использует `UIKitInteropProperties(placedAsOverlay = true)` и
+  прозрачный UIView. Android NavigationBar остаётся в Scaffold. Internal
+  `core/ui/LocalBottomNavigationInset` равен высоте overlay только на iOS; функции
+  используют его для хвоста списка, FAB и composer, не обрезая фон под стеклом.

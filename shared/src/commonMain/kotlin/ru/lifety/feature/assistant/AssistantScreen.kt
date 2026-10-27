@@ -47,7 +47,7 @@ fun AssistantScreen(modifier: Modifier = Modifier) {
         if (messages.isNotEmpty()) list.animateScrollToItem(messages.size + proposals.size)
     }
     fun send() { if (controller.send(input.trim()) != null) { input = ""; focus.clearFocus() } }
-    Column(modifier.fillMaxSize().imePadding()) {
+    Column(modifier.fillMaxSize().imePadding().padding(bottom = ru.lifety.core.ui.LocalBottomNavigationInset.current)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(if (state.connected) state.credentials.settings.model else "Подключите свою модель", Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
