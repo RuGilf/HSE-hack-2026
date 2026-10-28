@@ -1,0 +1,4 @@
+CREATE TABLE chatGptExchange (
+    id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+    workspace TEXT NOT NULL
+);

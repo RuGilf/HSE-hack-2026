@@ -11,7 +11,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import ru.lifety.feature.assistant.agent.*
-import ru.lifety.feature.assistant.transfer.PlanTransferContent
 import ru.lifety.core.ui.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,8 +24,8 @@ import ru.lifety.core.ui.*
     val configured = state.connected && entered == state.credentials
     ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Настройки агента", style = MaterialTheme.typography.titleLarge)
-            FilledTonalButton(onClick = openTransfer, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Экспорт / импорт с ChatGPT") }
+            Text("Встроенный чат · API", style = MaterialTheme.typography.titleLarge)
+            FilledTonalButton(onClick = openTransfer, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Вернуться к обмену с ChatGPT") }
             Text("Обмен планом работает без API-ключа.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             HorizontalDivider()
             Text("Подключение", style = MaterialTheme.typography.titleLarge)

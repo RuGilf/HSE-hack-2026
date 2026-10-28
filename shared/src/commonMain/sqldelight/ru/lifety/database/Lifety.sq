@@ -126,3 +126,12 @@ selectPlanReport:
 SELECT summary, importedAt FROM planReport WHERE id = 1;
 upsertPlanReport:
 INSERT OR REPLACE INTO planReport VALUES (1, ?, ?);
+
+CREATE TABLE chatGptExchange (
+    id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+    workspace TEXT NOT NULL
+);
+selectChatGptExchange:
+SELECT workspace FROM chatGptExchange WHERE id = 1;
+upsertChatGptExchange:
+INSERT OR REPLACE INTO chatGptExchange VALUES (1, ?);

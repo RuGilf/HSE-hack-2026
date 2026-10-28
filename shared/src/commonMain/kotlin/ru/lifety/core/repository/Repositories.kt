@@ -9,4 +9,5 @@ data class Repositories(
     val people: PersonRepository? = null,
     val goals: GoalRepository? = null,
     val planning: PlanningRepository? = null,
+    val chatGptExchange: ChatGptExchangeRepository? = null,
 )

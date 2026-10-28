@@ -13,7 +13,11 @@ data class PlanSnapshot(val tasks: List<Task>, val goals: List<Goal>, val detail
 data class PlannedTask(val taskId: String, val scheduledAt: String, val durationMinutes: Int, val approach: String, val goalId: String? = null)
 
 @Serializable
-data class ImportedPlan(val format: String, val baseSnapshot: String, val summary: String, val tasks: List<PlannedTask>)
+data class DeferredTask(val taskId: String, val reason: String)
+
+@Serializable
+data class ImportedPlan(val format: String, val baseSnapshot: String, val summary: String, val tasks: List<PlannedTask>,
+    val deferredTasks: List<DeferredTask> = emptyList(), val requestId: String? = null)
 
 val planExchangeJson = Json { prettyPrint = true; encodeDefaults = true }
 
@@ -25,21 +29,25 @@ fun snapshotFingerprint(snapshot: PlanSnapshot): String {
 }
 
 fun parseImportedPlan(text: String): ImportedPlan {
-    require(text.length <= 1_000_000) { "Ответ слишком большой. Вставьте только JSON плана." }
+    require(text.length <= 1_000_000) { "Ответ слишком большой. Вставьте только итоговый ответ с планом." }
     val trimmed = text.trim().removePrefix("\uFEFF")
     val body = if (trimmed.startsWith("```")) trimmed.substringAfter('\n').substringBeforeLast("```").trim() else trimmed
     return try { planExchangeJson.decodeFromString<ImportedPlan>(body) }
-    catch (_: Exception) { throw IllegalArgumentException("Не удалось прочитать план. Вставьте полный JSON-ответ ChatGPT с format, baseSnapshot, summary и tasks.") }
+    catch (_: Exception) { throw IllegalArgumentException("Ответ не похож на план Lifety. Скопируйте итоговый ответ целиком. Если ChatGPT ответил обычным текстом, попросите вернуть план в формате из запроса.") }
 }
 
 fun validateImportedPlan(plan: ImportedPlan, snapshot: PlanSnapshot, now: Long) {
-    require(plan.format == "lifety-plan-v1") { "Неподдерживаемый формат плана" }
+    require(plan.format in setOf("lifety-plan-v1", "lifety-plan-v2")) { "Неподдерживаемый формат плана" }
+    require(plan.format != "lifety-plan-v1" || plan.deferredTasks.isEmpty()) { "Для очереди задач нужен формат lifety-plan-v2" }
+    require(plan.format != "lifety-plan-v2" || !plan.requestId.isNullOrBlank()) { "В ответе нужен requestId из текущего запроса" }
     require(plan.baseSnapshot == snapshotFingerprint(snapshot)) { "Задачи, цели или план изменились после экспорта. Экспортируйте актуальные данные и получите новый план." }
     require(plan.summary.isNotBlank() && plan.summary.length <= 6000) { "В плане нужно краткое объяснение до 6000 символов" }
     val active = snapshot.tasks.filterNot { it.isCompleted }.associateBy { it.id }
     require(active.isNotEmpty()) { "Нет актуальных задач для планирования" }
-    require(plan.tasks.map { it.taskId }.toSet().size == plan.tasks.size) { "В плане повторяется задача" }
-    require(plan.tasks.map { it.taskId }.toSet() == active.keys) { "План должен содержать каждую актуальную задачу ровно один раз и только её ID" }
+    val ids = plan.tasks.map { it.taskId } + plan.deferredTasks.map { it.taskId }
+    require(ids.toSet().size == ids.size) { "В плане повторяется задача" }
+    require(ids.toSet() == active.keys) { "Каждая актуальная задача должна быть ровно один раз: в расписании или очереди, только с её ID" }
+    require(plan.deferredTasks.all { it.reason.isNotBlank() && it.reason.length <= 500 }) { "Для каждой задачи в очереди нужна причина до 500 символов" }
     val goals = snapshot.goals.filterNot { it.isCompleted }.map { it.id }.toSet()
     val slots = plan.tasks.map { item ->
         require(item.durationMinutes in 1..1440) { "Длительность задачи должна быть от 1 до 1440 минут" }

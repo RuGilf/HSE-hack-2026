@@ -578,7 +578,7 @@ interface PersonRepository {
   ограничивает день числом дней этого месяца; неизвестный год допускает 29 февраля.
   Выбор применяется только по «Готово», отмена не меняет поля карточки.
 
-## Глобальные цели и обмен планом с ChatGPT — schema v4
+## Глобальные цели и первоначальный обмен планом с ChatGPT — schema v4
 
 Все common Kotlin пути ниже относительно `shared/src/commonMain/kotlin/ru/lifety`.
 
@@ -630,3 +630,30 @@ interface PersonRepository {
 - Иконка меняется только по отдельной кнопке. UI читает фактическое состояние ОС,
   обработка ошибок не выдаёт неудачу за успешный выбор. Источники/лицензии,
   платформенные ограничения и результаты — [APPEARANCE.md](APPEARANCE.md).
+
+## Постоянный разговор ChatGPT / компактный контекст — schema v5
+
+- Основной AssistantScreen по умолчанию показывает ручной обмен; API-chat находится
+  в дополнительных настройках обмена. Публичные screen/route signatures сохранены.
+- `core/planning/ChatGptContext.kt`: ChatGptPreferences/Workspace/Draft/Sent/Receipt,
+  ExchangeBaseline/ContextChanges, SleepContext/DaySummary/MonthSummary.
+  Статистика сна локальная: последнее известное значение на день, 7 дней и
+  медианы всех доступных месяцев с coverage, без шагов/сырой истории.
+- `core/repository/ChatGptExchangeRepository.kt`: observe(): Flow<ChatGptWorkspace>,
+  suspend savePreferences(preferences), saveDraft(draft), markSent(draftId, now).
+  Repositories.chatGptExchange nullable default, AppContainer production подключает
+  SQLDelightChatGptExchangeRepository. Migration 4.sqm добавляет singleton
+  chatGptExchange, актуальная schema v5. Предыдущие модели/таблицы прежние.
+- Новый контекст/ответ v2 с requestId; ImportedPlan имеет default deferredTasks
+  и requestId, v1 по-прежнему читается и применяется по старым правилам.
+  v2 покрывает каждый active task либо слотом, либо DeferredTask(taskId, reason).
+  Очередь снимает scheduledAt, сохраняя дедлайн и старые оценки/goal link.
+- apply в одной транзакции валидирует задачи и текущий контекст сна/предпочтений,
+  сохраняет расписание/очередь/report и квитанцию обмена. Повтор v2 отклоняется.
+- Открытие share menu / копирование не считаются отправкой. Baseline обновляет
+  только отметка пользователя или применение коррелированного ответа v2.
+  Подготовленный текст может содержать выбранный сон; изменение настроек очищает
+  draft, отключение сна прекращает ожидание старого ответа. Baseline не хранит сон.
+- Private conversation URL необязателен; только HTTPS chatgpt.com/c/... либо
+  /g/.../c/..., без автопубликации, без чтения чужого чата. Детали и QA:
+  [CHATGPT_PLANNING.md](CHATGPT_PLANNING.md).

@@ -71,14 +71,15 @@ class PlanningPersistenceTest {
             } finally { job.cancelAndJoin(); rows.close() }
         }
     }
-    @Test fun migrationThreeToFourPreservesAllExistingRecords() = runBlocking {
+    @Test fun migrationThreeToCurrentPreservesAllExistingRecords() = runBlocking {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY); LifetyDatabase.Schema.create(driver)
-        // Reconstruct the real v3 table set, then run only the new migration.
+        // Reconstruct the real v3 table set, then run the additive migration chain.
+        driver.execute(null, "DROP TABLE chatGptExchange", 0)
         driver.execute(null, "DROP TABLE goal", 0); driver.execute(null, "DROP TABLE taskPlan", 0); driver.execute(null, "DROP TABLE planReport", 0)
         driver.execute(null, "INSERT INTO task VALUES ('t','Старая задача',NULL,100,0)", 0)
         driver.execute(null, "INSERT INTO person VALUES ('p','Друг',10,27,NULL,'Кино','Бег','Книга')", 0)
         driver.execute(null, "INSERT INTO expense VALUES ('e',9007199254740993,'RUB','Shop','taxi',1,'manual')", 0)
-        LifetyDatabase.Schema.migrate(driver, 3, 4)
+        LifetyDatabase.Schema.migrate(driver, 3, LifetyDatabase.Schema.version)
         AppContainer(driver).use { app ->
             assertEquals("Старая задача", app.repositories.tasks.observeAll().first().single().title)
             assertEquals("Друг", app.repositories.people!!.observeAll().first().single().fullName)
