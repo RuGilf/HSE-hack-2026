@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import ru.lifety.core.ui.LifetyBottomSheet
 import ru.lifety.core.model.ExpenseCategory
 import ru.lifety.core.ui.LifetyIcon
 import ru.lifety.core.ui.LifetySymbol
@@ -35,7 +36,7 @@ internal fun CategoryManagerSheet(state: CategoryUiState, onSave: suspend (Expen
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true,
         confirmValueChange = { it != SheetValue.Hidden || !busy || closing })
     val close = { if (!busy) scope.launch { closing = true; sheet.hide(); onDismiss() }; Unit }
-    ModalBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = sheet,
+    LifetyBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = sheet,
         containerColor = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.9f).imePadding().padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -18,7 +18,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.IconButton
@@ -48,6 +47,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.datetime.TimeZone
+import ru.lifety.core.ui.LifetyBottomSheet
 import ru.lifety.core.planner.taskTimingError
 import ru.lifety.core.time.localDate
 import ru.lifety.core.time.today
@@ -76,7 +76,7 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
     val close: () -> Unit = { if (!closing && !state.saving) scope.launch { closing = true; sheet.hide(); onClose() } }
     BoxWithConstraints(modifier.fillMaxSize()) {
         val sheetHeight = maxHeight * 0.92f
-        ModalBottomSheet(onDismissRequest = { if (!state.saving) onClose() }, sheetState = sheet,
+        LifetyBottomSheet(onDismissRequest = { if (!state.saving) onClose() }, sheetState = sheet,
             containerColor = MaterialTheme.colorScheme.background) {
             Scaffold(modifier = Modifier.fillMaxWidth().height(sheetHeight), contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 topBar = {

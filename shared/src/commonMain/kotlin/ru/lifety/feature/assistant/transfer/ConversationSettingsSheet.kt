@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import ru.lifety.core.ui.LifetyBottomSheet
 import ru.lifety.core.planning.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,7 +22,7 @@ internal fun ConversationSettingsSheet(preferences: ChatGptPreferences, busy: Bo
     var sleep by rememberSaveable(preferences.includeSleep) { mutableStateOf(preferences.includeSleep) }
     var url by rememberSaveable(preferences.conversationUrl) { mutableStateOf(preferences.conversationUrl) }
     var urlError by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), contentColor = MaterialTheme.colorScheme.onSurface) {
+    LifetyBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Ваш разговор ChatGPT", style = MaterialTheme.typography.titleLarge)
             Text("Создайте один разговор или проект в ChatGPT и возвращайтесь в него с обновлениями Lifety.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

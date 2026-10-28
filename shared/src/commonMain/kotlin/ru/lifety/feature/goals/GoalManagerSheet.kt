@@ -47,7 +47,7 @@ internal fun GoalManagerSheet(initialId: String? = null, onDismiss: () -> Unit) 
             finally { busy = false }
         }
     }
-    ModalBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = sheet) {
+    LifetyBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = sheet) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (editing != null) IconButton(onClick = { editing = null }, enabled = !busy) { LifetyIcon(LifetySymbol.Back) }

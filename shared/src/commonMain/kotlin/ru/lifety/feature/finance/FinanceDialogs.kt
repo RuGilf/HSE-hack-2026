@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import ru.lifety.core.ui.LifetyBottomSheet
 import ru.lifety.core.model.Expense
 import ru.lifety.core.ui.LifetyDateField
 import ru.lifety.core.ui.LifetyIcon
@@ -47,7 +48,7 @@ internal fun ExpenseEditorDialog(
     val currentLocked by rememberUpdatedState(locked)
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true,
         confirmValueChange = { it != SheetValue.Hidden || !currentLocked || closing })
-    ModalBottomSheet(onDismissRequest = { if (!locked) onDismiss() }, sheetState = sheet,
+    LifetyBottomSheet(onDismissRequest = { if (!locked) onDismiss() }, sheetState = sheet,
         containerColor = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding().padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {

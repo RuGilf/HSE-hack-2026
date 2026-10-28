@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import ru.lifety.core.ui.LifetyBottomSheet
 import ru.lifety.core.model.Person
 import ru.lifety.core.model.personValidationError
 import ru.lifety.core.repository.PersonRepository
@@ -71,7 +72,7 @@ internal fun PersonEditorSheet(initial: Person, isNew: Boolean, repository: Pers
             finally { busy = false }
         }
     }
-    ModalBottomSheet(onDismissRequest = { if (!blocked) onDismiss() }, sheetState = sheet,
+    LifetyBottomSheet(onDismissRequest = { if (!blocked) onDismiss() }, sheetState = sheet,
         containerColor = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {

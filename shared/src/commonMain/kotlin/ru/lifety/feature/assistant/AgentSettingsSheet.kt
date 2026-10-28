@@ -22,7 +22,7 @@ import ru.lifety.core.ui.*
     var confirmScopes by remember { mutableStateOf(false) }
     val entered = AgentCredentials(state.credentials.settings.copy(baseUrl = base.trim().trimEnd('/').removeSuffix("/chat/completions"), model = model.trim()), key.trim())
     val configured = state.connected && entered == state.credentials
-    ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    LifetyBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Встроенный чат · API", style = MaterialTheme.typography.titleLarge)
             FilledTonalButton(onClick = openTransfer, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Вернуться к обмену с ChatGPT") }

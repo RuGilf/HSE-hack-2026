@@ -124,7 +124,7 @@ fun HealthScreen(modifier: Modifier = Modifier) {
                 }
             }
         }
-        if (showManual) ModalBottomSheet(onDismissRequest = { if (!state.saving) showManual = false }, sheetState = sheet) {
+        if (showManual) LifetyBottomSheet(onDismissRequest = { if (!state.saving) showManual = false }, sheetState = sheet) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Запись здоровья", style = MaterialTheme.typography.titleLarge)
                 LifetyDateField("Дата показателей", manualDate, { manualDate = it }, enabled = formEnabled)

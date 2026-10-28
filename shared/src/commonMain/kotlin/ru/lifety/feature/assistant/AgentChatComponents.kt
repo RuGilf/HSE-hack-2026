@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
+import ru.lifety.core.ui.LifetyBottomSheet
 import ru.lifety.feature.assistant.agent.*
 import ru.lifety.feature.assistant.ai.assistantLocalTime
 import com.mikepenz.markdown.m3.Markdown
@@ -108,7 +109,7 @@ internal fun describeAgentAction(kind: String, body: JsonObject): String {
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { error = "Не удалось прочитать сохранённые материалы" }
     }
-    ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    LifetyBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Сохранённое", style = MaterialTheme.typography.titleLarge)
             if (content != null) {

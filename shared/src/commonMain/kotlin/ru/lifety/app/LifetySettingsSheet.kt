@@ -35,7 +35,7 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
     val controller = LocalAppearance.current ?: return
     val state by controller.state.collectAsState()
     LaunchedEffect(controller) { controller.refreshIcon() }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, contentColor = MaterialTheme.colorScheme.onSurface) {
+    LifetyBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.CenterHorizontally)
             .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)) {
