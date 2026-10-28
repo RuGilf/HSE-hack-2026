@@ -1,0 +1,18 @@
+CREATE TABLE goal (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    targetAt INTEGER,
+    isCompleted INTEGER NOT NULL
+);
+CREATE TABLE taskPlan (
+    taskId TEXT NOT NULL PRIMARY KEY,
+    durationMinutes INTEGER NOT NULL,
+    approach TEXT NOT NULL,
+    goalId TEXT
+);
+CREATE TABLE planReport (
+    id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+    summary TEXT NOT NULL,
+    importedAt INTEGER NOT NULL
+);

@@ -38,6 +38,7 @@ import kotlin.time.Clock
 
 @Composable
 fun TaskCard(task: Task, busy: Boolean, onOpen: () -> Unit, onToggle: () -> Unit, onDelete: (() -> Unit)? = null, now: Long = Clock.System.now().toEpochMilliseconds()) {
+    val plan = LocalPlanningState.current.plans[task.id]
     var menu by remember { mutableStateOf(false) }
     val titleColor by animateColorAsState(
         if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
@@ -70,6 +71,8 @@ fun TaskCard(task: Task, busy: Boolean, onOpen: () -> Unit, onToggle: () -> Unit
                             else -> MaterialTheme.colorScheme.onSurfaceVariant })
                 } ?: Text(if (task.scheduledAt == null) "Без даты и дедлайна" else "Дедлайн не задан",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                plan?.let { Text("${it.durationMinutes} мин · ${it.approach}", style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             if (onDelete != null) {
                 Column {

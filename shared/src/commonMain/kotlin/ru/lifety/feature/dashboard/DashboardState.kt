@@ -66,7 +66,7 @@ internal fun formatMinor(amount: Long, currency: String): String {
     return (if (amount < 0) "−" else "") + number + " " + currency
 }
 
-data class DashboardUiState(val loading: Boolean = true, val summary: DashboardSummary = DashboardSummary(), val date: String = "", val error: String? = null)
+data class DashboardUiState(val loading: Boolean = true, val summary: DashboardSummary = DashboardSummary(), val date: String = "", val error: String? = null, val allTasks: List<Task> = emptyList())
 
 class DashboardController(repositories: Repositories?, scope: CoroutineScope) {
     private val mutableState = MutableStateFlow(DashboardUiState(loading = repositories != null))
@@ -77,7 +77,7 @@ class DashboardController(repositories: Repositories?, scope: CoroutineScope) {
                 val clock = flow { while (true) { emit(Clock.System.now().toEpochMilliseconds()); delay(30_000) } }
                 combine(repositories.tasks.observeAll(), repositories.expenses.observeAll(), repositories.health.observeLatest(), clock) { tasks, expenses, health, now ->
                     val period = dashboardPeriod(now)
-                    DashboardUiState(false, summarizeDashboard(tasks, expenses, health, now, period), period.label)
+                    DashboardUiState(false, summarizeDashboard(tasks, expenses, health, now, period), period.label, allTasks = tasks)
                 }.collect { mutableState.value = it }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { mutableState.value = mutableState.value.copy(loading = false, error = "Не удалось загрузить обзор. Повторите попытку.") }

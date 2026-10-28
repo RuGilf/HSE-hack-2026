@@ -539,7 +539,7 @@ interface PersonRepository {
 - `core/model/PersonValidation.kt`: `personValidationError(person, currentDate)`;
   модель хранит гражданскую дату, а не timestamp. День/месяц либо оба null, либо
   корректная дата; год необязателен. Подробности — [PEOPLE.md](PEOPLE.md).
-- **Текущая schema v3**: таблицы `task`, `expense`, `healthSnapshot`,
+- **Schema v3 на момент добавления людей**: таблицы `task`, `expense`, `healthSnapshot`,
   `expenseCategory`, `person`. `2.sqm` добавляет `person`, `1.sqm` сохранён.
   Adapter для nullable Int подключён в `createDatabase`.
 - `feature/people/PeopleScreen.kt`, пакет `ru.lifety.feature.people`:
@@ -558,7 +558,7 @@ interface PersonRepository {
 
 ## Списки в карточках людей / нативная дата iOS
 
-- Person / PersonRepository / SQL schema **v3** не меняются. `interests`, `hobbies`,
+- Person / PersonRepository и хранение людей из schema **v3** не меняются. `interests`, `hobbies`,
   `giftIdeas` остаются String: один пункт на строку, без JSON. Старый текст
   отображается списком по переносам строк; запятые и URL не разделяются.
 - `feature/people/PersonNotes.kt`: internal codec `personNoteItems`,
@@ -577,3 +577,38 @@ interface PersonRepository {
 - Дата передаётся как гражданский день/месяц/необязательный год. Смена месяца/года
   ограничивает день числом дней этого месяца; неизвестный год допускает 29 февраля.
   Выбор применяется только по «Готово», отмена не меняет поля карточки.
+
+## Глобальные цели и обмен планом с ChatGPT — schema v4
+
+Все common Kotlin пути ниже относительно `shared/src/commonMain/kotlin/ru/lifety`.
+
+- `core/model/Goal.kt`: serializable `Goal(id: String, title: String,
+  description: String = "", targetAt: Long? = null, isCompleted: Boolean = false)`,
+  `TaskPlan(taskId: String, durationMinutes: Int, approach: String = "", goalId: String? = null)`,
+  `PlanReport(summary: String, importedAt: Long)`.
+- `core/repository/PlanningRepository.kt`: `GoalRepository.observeAll(): Flow<List<Goal>>`,
+  `suspend upsert(goal)`, `suspend delete(id)`; `PlanningRepository.observeAll(): Flow<List<TaskPlan>>`,
+  `observeReport(): Flow<PlanReport?>`, `suspend snapshot(): PlanSnapshot`,
+  `suspend apply(plan: ImportedPlan, now: Long)`. Apply повторно валидирует актуальный
+  snapshot и атомарно записывает расписание/детали/разбор. No partial application.
+- `Repositories` дополнен `goals: GoalRepository? = null`,
+  `planning: PlanningRepository? = null`. `AppContainer` создаёт
+  `SqlDelightGoalRepository` и `SqlDelightPlanningRepository` на общем driver.
+- Schema **v4**: migration `3.sqm` добавляет goal/taskPlan/planReport; старые
+  таблицы и Task/Expense/Health/Person signatures сохранены. Удаление Task
+  транзакционно убирает TaskPlan; удаление Goal очищает goalId и сохраняет задачи.
+- `core/planning/PlanExchange.kt`: versioned JSON, `PlanSnapshot`, `PlannedTask`,
+  `ImportedPlan`, fingerprint, exporter/parser/validator. Полный формат,
+  ограничения и ручной сценарий — [CHATGPT_PLANNING.md](CHATGPT_PLANNING.md).
+- `core/ui/PlanningProvider.kt` — internal общая реактивная проекция для UI,
+  LocalPlanningState / LocalPlanningRetry. Один набор наблюдений на приложение.
+- DashboardScreen signature прежняя; цели открываются в
+  `feature/goals/GoalManagerSheet.kt`. Пять primary destinations/route IDs сохранены.
+- AgentSettingsSheet содержит вход обмена без API-ключа. Контроллер
+  `feature/assistant/transfer/PlanTransferController.kt` выдаёт StateFlow состояния,
+  preview не меняет БД. Share/file import — expect/actual Android/iOS; JSON — данные,
+  не команды и не исполняемый код. Credentials в экспорт не включаются.
+- TaskCard/TaskEditor/Calendar/главная получают estimates и approach из общего DI;
+  поля Task и обязательные публичные screen signatures не меняются.
+- Агент с tasks scope экспортирует актуальные goals/taskPlans/report вместе с tasks
+  перед запросом; без scope эти данные удаляются из generated workspace.

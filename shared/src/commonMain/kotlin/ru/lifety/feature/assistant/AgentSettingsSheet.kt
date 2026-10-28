@@ -11,9 +11,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import ru.lifety.feature.assistant.agent.*
+import ru.lifety.feature.assistant.transfer.PlanTransferContent
+import ru.lifety.core.ui.*
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable internal fun AgentSettingsSheet(state: AgentChatState, controller: AgentChatController, dismiss: () -> Unit) {
+@Composable internal fun AgentSettingsSheet(state: AgentChatState, controller: AgentChatController, openTransfer: () -> Unit, dismiss: () -> Unit) {
     var base by remember(state.credentials) { mutableStateOf(state.credentials.settings.baseUrl) }
     var model by remember(state.credentials) { mutableStateOf(state.credentials.settings.model) }
     var key by remember(state.credentials) { mutableStateOf(state.credentials.key) }
@@ -23,6 +25,10 @@ import ru.lifety.feature.assistant.agent.*
     val configured = state.connected && entered == state.credentials
     ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Настройки агента", style = MaterialTheme.typography.titleLarge)
+            FilledTonalButton(onClick = openTransfer, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Экспорт / импорт с ChatGPT") }
+            Text("Обмен планом работает без API-ключа.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            HorizontalDivider()
             Text("Подключение", style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(base, { base = it }, Modifier.fillMaxWidth(), label = { Text("Адрес API, включая /v1") }, singleLine = true, enabled = !state.busy,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
@@ -42,7 +48,7 @@ import ru.lifety.feature.assistant.agent.*
             Text("Выбранные сведения и прочитанные материалы могут отправляться вашему LLM API после отправки сообщения. Изменения записей потребуют подтверждения.", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             ScopeToggle("Расходы", scopes.finance, state.connected && !state.busy) { scopes = scopes.copy(finance = it) }
-            ScopeToggle("Задачи", scopes.tasks, state.connected && !state.busy) { scopes = scopes.copy(tasks = it) }
+            ScopeToggle("Задачи, цели и план", scopes.tasks, state.connected && !state.busy) { scopes = scopes.copy(tasks = it) }
             ScopeToggle("Здоровье", scopes.health, state.connected && !state.busy) { scopes = scopes.copy(health = it) }
             ScopeToggle("Личная память", scopes.memory, state.connected && !state.busy) { scopes = scopes.copy(memory = it) }
             FilledTonalButton(onClick = { confirmScopes = true },

@@ -53,6 +53,7 @@ import ru.lifety.core.time.localDate
 import ru.lifety.core.time.today
 import ru.lifety.core.ui.LifetyIcon
 import ru.lifety.core.ui.LifetySymbol
+import ru.lifety.core.ui.LocalPlanningState
 import ru.lifety.core.ui.LocalRepositories
 import ru.lifety.core.ui.PlaceholderScreen
 
@@ -111,6 +112,15 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
                                 supportingText = if (task.title.isBlank() && state.error != null) ({ Text("Добавьте название задачи") }) else null)
                             state.error?.takeUnless { it == timingError || task.title.isBlank() }?.let {
                                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            LocalPlanningState.current.plans[task.id]?.let { plan ->
+                                Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("План выполнения · ${plan.durationMinutes} мин", style = MaterialTheme.typography.titleMedium)
+                                        Text(plan.approach, style = MaterialTheme.typography.bodyMedium)
+                                        LocalPlanningState.current.goals.find { it.id == plan.goalId }?.let { Text("Цель: ${it.title}", color = MaterialTheme.colorScheme.primary) }
+                                    }
+                                }
                             }
                             TaskDateTimeField("Дедлайн", "Когда дело должно быть готово. Дата без уточнения времени — до 23:59.",
                                 task.deadlineAt, !state.saving, task.scheduledAt?.let { localDate(it) } ?: today(), true, model::setDeadlineAt)

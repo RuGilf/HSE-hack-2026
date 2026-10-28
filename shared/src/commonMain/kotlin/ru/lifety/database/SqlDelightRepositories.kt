@@ -34,7 +34,7 @@ class SqlDelightTaskRepository(
         Unit
     }
 
-    override suspend fun delete(id: String) = withContext(dispatcher) { queries.deleteTask(id); Unit }
+    override suspend fun delete(id: String) = withContext(dispatcher) { queries.transaction { queries.deleteTaskPlan(id); queries.deleteTask(id) }; Unit }
 }
 
 class SqlDelightExpenseCategoryRepository(

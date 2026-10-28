@@ -61,7 +61,7 @@ class PersonPersistenceTest {
         }
     }
 
-    @Test fun migrationTwoToThreePreservesPlannerFinanceCategoriesAndHealth() = runBlocking {
+    @Test fun migrationTwoToCurrentPreservesPlannerFinanceCategoriesAndHealth() = runBlocking {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         driver.execute(null, "CREATE TABLE task(id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, scheduledAt INTEGER, deadlineAt INTEGER, isCompleted INTEGER NOT NULL)", 0)
         driver.execute(null, "CREATE TABLE expense(id TEXT NOT NULL PRIMARY KEY, amountMinor INTEGER NOT NULL, currency TEXT NOT NULL, merchant TEXT NOT NULL, category TEXT NOT NULL, timestamp INTEGER NOT NULL, source TEXT NOT NULL)", 0)
@@ -71,7 +71,7 @@ class PersonPersistenceTest {
         driver.execute(null, "INSERT INTO expense VALUES ('e',9007199254740993,'RUB','Магазин','custom:taxi',100,'manual')", 0)
         driver.execute(null, "INSERT INTO healthSnapshot VALUES (100,420,8000)", 0)
         driver.execute(null, "INSERT INTO expenseCategory VALUES ('custom:taxi','Такси','#D5A1FF',0)", 0)
-        assertEquals(3L, LifetyDatabase.Schema.version)
+        assertEquals(4L, LifetyDatabase.Schema.version)
         LifetyDatabase.Schema.migrate(driver, 2, LifetyDatabase.Schema.version)
         AppContainer(driver).use { app ->
             assertEquals(300L, app.repositories.tasks.observeAll().first().single().deadlineAt)

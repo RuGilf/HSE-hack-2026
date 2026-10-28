@@ -58,6 +58,7 @@ import ru.lifety.core.ui.LifetyIcon
 import ru.lifety.core.ui.LifetyMascot
 import ru.lifety.core.ui.LifetySymbol
 import ru.lifety.core.ui.LifetyTheme
+import ru.lifety.core.ui.PlanningProvider
 import ru.lifety.core.ui.LocalRepositories
 import ru.lifety.core.ui.LocalBottomNavigationInset
 import ru.lifety.core.ui.isIos
@@ -98,6 +99,7 @@ fun LifetyApp(repositories: Repositories? = null) {
             override fun createTask(scheduledAt: Long?) { controller.navigate(TaskEditorRoute(scheduledAt = scheduledAt)) { launchSingleTop = true } }
         }
     }
+    PlanningProvider(repositories) {
     LifetyTheme {
         CompositionLocalProvider(LocalRepositories provides repositories, LocalPlannerNavigation provides planner, LocalRootNavigator provides navigator) {
             val section = if (route == AppDestination.CALENDAR.route) AppDestination.TASKS else AppDestination.fromRoute(route.orEmpty())
@@ -165,4 +167,5 @@ fun LifetyApp(repositories: Repositories? = null) {
             }
         }
     }
+}
 }

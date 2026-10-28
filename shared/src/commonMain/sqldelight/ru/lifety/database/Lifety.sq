@@ -1,7 +1,7 @@
 import kotlin.Boolean;
 import kotlin.Int;
 
--- Schema version 3: people; migrations preserve all existing data.
+-- Schema version 4: goals and imported planning; migrations preserve all existing data.
 CREATE TABLE task (
     id TEXT NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,
@@ -89,3 +89,40 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 deletePerson:
 DELETE FROM person WHERE id = ?;
+
+CREATE TABLE goal (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    targetAt INTEGER,
+    isCompleted INTEGER AS Boolean NOT NULL
+);
+CREATE TABLE taskPlan (
+    taskId TEXT NOT NULL PRIMARY KEY,
+    durationMinutes INTEGER AS Int NOT NULL,
+    approach TEXT NOT NULL,
+    goalId TEXT
+);
+CREATE TABLE planReport (
+    id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+    summary TEXT NOT NULL,
+    importedAt INTEGER NOT NULL
+);
+selectGoals:
+SELECT * FROM goal ORDER BY isCompleted, targetAt IS NULL, targetAt, id;
+upsertGoal:
+INSERT OR REPLACE INTO goal VALUES (?, ?, ?, ?, ?);
+deleteGoal:
+DELETE FROM goal WHERE id = ?;
+clearGoalLinks:
+UPDATE taskPlan SET goalId = NULL WHERE goalId = ?;
+selectTaskPlans:
+SELECT * FROM taskPlan ORDER BY taskId;
+upsertTaskPlan:
+INSERT OR REPLACE INTO taskPlan VALUES (?, ?, ?, ?);
+deleteTaskPlan:
+DELETE FROM taskPlan WHERE taskId = ?;
+selectPlanReport:
+SELECT summary, importedAt FROM planReport WHERE id = 1;
+upsertPlanReport:
+INSERT OR REPLACE INTO planReport VALUES (1, ?, ?);

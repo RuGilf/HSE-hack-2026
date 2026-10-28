@@ -1,6 +1,8 @@
 package ru.lifety.feature.assistant
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -20,6 +22,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import ru.lifety.core.ui.*
 import ru.lifety.feature.assistant.agent.*
+import ru.lifety.feature.assistant.transfer.PlanTransferContent
 import com.mikepenz.markdown.m3.Markdown
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,14 +33,24 @@ fun AssistantScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val controller = remember(runtime, repositories, scope) { AgentChatController(runtime, repositories, scope) }
     val state by controller.state.collectAsState()
+    var exchange by rememberSaveable { mutableStateOf(false) }
+    var transferBusy by remember { mutableStateOf(false) }
     var settings by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
+    var importedExpanded by remember { mutableStateOf(false) }
     var clearChat by remember { mutableStateOf(false) }
     var input by rememberSaveable { mutableStateOf("") }
     val list = rememberLazyListState()
     val focus = LocalFocusManager.current
     LaunchedEffect(controller) { controller.initialize().join() }
     DisposableEffect(controller) { onDispose { controller.close() } }
+    if (exchange) {
+        Column(modifier.fillMaxSize().imePadding().padding(bottom = LocalBottomNavigationInset.current)) {
+            TextButton(onClick = { exchange = false }, enabled = !transferBusy, modifier = Modifier.padding(horizontal = 16.dp)) { Text("‹ К ассистенту") }
+            PlanTransferContent(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), onBusyChanged = { transferBusy = it })
+        }
+        return
+    }
     val messages = remember(state.view.document.messages) {
         state.view.document.messages.filter { (it.role == "user" && !it.text.startsWith("APP_RECEIPT:")) || (it.role == "assistant" && it.text.isNotBlank()) }
     }
@@ -49,11 +62,22 @@ fun AssistantScreen(modifier: Modifier = Modifier) {
     fun send() { if (controller.send(input.trim()) != null) { input = ""; focus.clearFocus() } }
     Column(modifier.fillMaxSize().imePadding().padding(bottom = ru.lifety.core.ui.LocalBottomNavigationInset.current)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (state.connected) state.credentials.settings.model else "Подключите свою модель", Modifier.weight(1f),
+            Text(if (state.connected) state.credentials.settings.model else "ChatGPT или своя модель", Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             TextButton(onClick = { saved = true }, enabled = state.connected && !state.busy) { Text("Сохранённое") }
             IconButton(onClick = { settings = true }, enabled = !state.busy,
                 modifier = Modifier.semantics { contentDescription = "Настройки ассистента" }) { LifetyIcon(LifetySymbol.Settings) }
+        }
+        LocalPlanningState.current.report?.let { report ->
+            Surface(onClick = { importedExpanded = !importedExpanded }, shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth().heightIn(max = 220.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("План из ChatGPT · ${ru.lifety.core.time.formatDateTime(report.importedAt)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(report.summary, style = MaterialTheme.typography.bodySmall, maxLines = if (importedExpanded) Int.MAX_VALUE else 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    if (!state.view.document.scopes.tasks) Text("Включите доступ к задачам в настройках, чтобы агент учитывал план.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
         if (messages.isEmpty()) {
             Column(Modifier.weight(1f).fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -95,7 +119,7 @@ fun AssistantScreen(modifier: Modifier = Modifier) {
         }
         if (messages.isNotEmpty()) TextButton(onClick = { clearChat = true }, enabled = !state.busy, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Новый разговор") }
     }
-    if (settings) AgentSettingsSheet(state, controller) { settings = false }
+    if (settings) AgentSettingsSheet(state, controller, openTransfer = { settings = false; exchange = true }) { settings = false }
     if (saved) SavedAgentSheet(state, controller) { saved = false }
     if (clearChat) AlertDialog(onDismissRequest = { clearChat = false }, title = { Text("Начать новый разговор?") },
         text = { Text("Переписка очистится. Подтверждённая память и сохранённые разборы останутся.") },

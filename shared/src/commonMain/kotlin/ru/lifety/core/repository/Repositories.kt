@@ -7,4 +7,6 @@ data class Repositories(
     val health: HealthRepository,
     val expenseCategories: ExpenseCategoryRepository? = null,
     val people: PersonRepository? = null,
+    val goals: GoalRepository? = null,
+    val planning: PlanningRepository? = null,
 )

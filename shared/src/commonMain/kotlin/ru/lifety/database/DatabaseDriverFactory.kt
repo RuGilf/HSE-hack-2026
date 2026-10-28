@@ -21,4 +21,5 @@ fun createDatabase(driver: SqlDriver): LifetyDatabase = LifetyDatabase(
     driver,
     healthSnapshotAdapter = HealthSnapshot.Adapter(intAdapter, intAdapter),
     personAdapter = Person.Adapter(intAdapter, intAdapter, intAdapter),
+    taskPlanAdapter = TaskPlan.Adapter(intAdapter),
 )
