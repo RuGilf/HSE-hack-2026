@@ -13,6 +13,7 @@ import ru.lifety.core.planning.*
 import ru.lifety.database.generated.LifetyDatabase
 import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
+import ru.lifety.core.planner.taskIntervalError
 
 class SqlDelightGoalRepository(database: LifetyDatabase, private val dispatcher: CoroutineDispatcher = Dispatchers.IO) : GoalRepository {
     private val queries = database.lifetyQueries
@@ -33,6 +34,16 @@ class SqlDelightPlanningRepository(database: LifetyDatabase, private val dispatc
     override fun observeReport(): Flow<PlanReport?> = queries.selectPlanReport(::PlanReport).asFlow().mapToOneOrNull(dispatcher)
     private fun readSnapshot() = PlanSnapshot(queries.selectTasks(::Task).executeAsList(), queries.selectGoals(::Goal).executeAsList(), queries.selectTaskPlans(::TaskPlan).executeAsList())
     override suspend fun snapshot(): PlanSnapshot = withContext(dispatcher) { queries.transactionWithResult { readSnapshot() } }
+    override suspend fun saveTask(task: Task, details: TaskPlan?) = withContext(dispatcher) {
+        require(task.id.isNotBlank() && task.title.isNotBlank())
+        require(details == null || details.taskId == task.id && details.durationMinutes in 1..1440 && details.approach.length <= 6000)
+        require(taskIntervalError(task, details?.durationMinutes) == null)
+        queries.transaction {
+            require(details?.goalId == null || queries.selectGoals(::Goal).executeAsList().any { it.id == details.goalId })
+            queries.upsertTask(task.id, task.title.trim(), task.scheduledAt, task.deadlineAt, task.isCompleted)
+            if (details == null) queries.deleteTaskPlan(task.id) else queries.upsertTaskPlan(task.id, details.durationMinutes, details.approach.trim(), details.goalId)
+        }
+    }
     override suspend fun apply(plan: ImportedPlan, now: Long) = withContext(dispatcher) {
         queries.transaction {
             val snapshot = readSnapshot()

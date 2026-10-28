@@ -17,4 +17,6 @@ interface PlanningRepository {
     suspend fun snapshot(): PlanSnapshot
     /** Revalidates the current snapshot and applies every schedule/estimate in one transaction. */
     suspend fun apply(plan: ImportedPlan, now: Long)
+    /** Saves a manual schedule and its estimate/steps atomically; null clears planning metadata. */
+    suspend fun saveTask(task: Task, details: TaskPlan?) { throw UnsupportedOperationException("Manual planning is unavailable") }
 }

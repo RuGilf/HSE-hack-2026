@@ -39,6 +39,10 @@ fun TasksScreen(modifier: Modifier = Modifier) {
     var filterName by rememberSaveable { mutableStateOf(TaskFilter.ACTIVE.name) }
     val filter = TaskFilter.valueOf(filterName)
     var allDates by rememberSaveable { mutableStateOf(false) }
+    var timelineMode by rememberSaveable { mutableStateOf(true) }
+    var fromHour by rememberSaveable { mutableIntStateOf(8) }
+    var untilHour by rememberSaveable { mutableIntStateOf(22) }
+    var hoursDialog by remember { mutableStateOf(false) }
     // null follows today across midnight; an explicitly selected date stays fixed.
     var selectedIso by rememberSaveable { mutableStateOf<String?>(null) }
     var showDate by rememberSaveable { mutableStateOf(false) }
@@ -48,6 +52,12 @@ fun TasksScreen(modifier: Modifier = Modifier) {
     val today = localDate(now, zone)
     val selected = selectedIso?.let { LocalDate.parse(it) } ?: today
     val plan = remember(state.tasks, selected, now, zone) { dayPlan(state.tasks, selected, now, zone) }
+    val planningState = LocalPlanningState.current
+    val retryPlanning = LocalPlanningRetry.current
+    val details = planningState.plans
+    val timeline = remember(state.tasks, details, selected, zone, filter, fromHour, untilHour) {
+        dayTimeline(visibleTasks(state.tasks, filter), details, selected, zone, fromHour, untilHour)
+    }
     var pendingDelete by remember { mutableStateOf<Task?>(null) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.actionError) { state.actionError?.let { snackbar.showSnackbar(it); model.dismissError() } }
@@ -86,13 +96,24 @@ fun TasksScreen(modifier: Modifier = Modifier) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TaskFilter.entries.forEach { item -> FilterChip(selected = filter == item, onClick = { filterName = item.name }, label = { Text(item.title) }) }
             }
+            if (!allDates) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                FilterChip(selected = timelineMode, onClick = { timelineMode = !timelineMode }, label = { Text(if (timelineMode) "По времени" else "Списком") })
+                Spacer(Modifier.weight(1f))
+                if (timelineMode) TextButton(onClick = { hoursDialog = true }) { Text("Окна $fromHour:00–$untilHour:00") }
+            }
             when {
                 state.loading -> CircularProgressIndicator(Modifier.padding(24.dp))
                 state.readError != null -> Column {
                     Text(requireNotNull(state.readError), color = MaterialTheme.colorScheme.error)
                     Button(onClick = model::retry) { Text("Повторить") }
                 }
+                !allDates && timelineMode && planningState.loading -> CircularProgressIndicator(Modifier.padding(24.dp))
+                !allDates && timelineMode && planningState.error != null -> Column {
+                    Text(requireNotNull(planningState.error), color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = retryPlanning) { Text("Повторить") }
+                }
                 else -> {
+                    val timedIds = if (!allDates && timelineMode) timeline.tasks.mapTo(mutableSetOf()) { it.task.id } else emptySet()
                     val sections = if (allDates) listOf("" to visibleTasks(state.tasks, filter)) else buildList {
                         if (filter != TaskFilter.COMPLETED) {
                             add("Просроченные" to plan.overdue)
@@ -101,9 +122,11 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                             add("Без даты" to plan.undated)
                         }
                         if (filter != TaskFilter.ACTIVE) add("Завершённые" to plan.completed)
-                    }.filter { it.second.isNotEmpty() }
+                    }.map { (title, rows) -> title to rows.filter { it.id !in timedIds } }.filter { it.second.isNotEmpty() }
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 100.dp + bottomInset)) {
-                        if (sections.all { it.second.isEmpty() }) item {
+                        if (!allDates && timelineMode) dayTimelineItems(timeline, selected, zone, now, filter != TaskFilter.COMPLETED, state.busyIds,
+                            { planner?.openTask(it.id) }, model::toggle, { planner?.createTask(it) })
+                        if (sections.all { it.second.isEmpty() } && (allDates || !timelineMode || timeline.tasks.isEmpty() && filter == TaskFilter.COMPLETED)) item {
                             LifetyEmptyState(title = if (filter == TaskFilter.COMPLETED) "Пока нет завершённых дел" else "День свободен",
                                 message = if (filter == TaskFilter.COMPLETED) "Здесь будут завершённые дела выбранного периода. Все записи доступны через «Все даты»."
                                     else "Добавь дело и укажи, когда заняться им или к какому сроку закончить.", emotion = LifetyEmotion.Calm,
@@ -118,6 +141,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
             }
         }
     }
+    if (hoursDialog) TimelineHoursDialog(fromHour, untilHour, onSave = { from, until -> fromHour = from; untilHour = until; hoursDialog = false }, onDismiss = { hoursDialog = false })
     if (showDate) {
         val picker = rememberDatePickerState(initialSelectedDateMillis = selected.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds())
         DatePickerDialog(onDismissRequest = { showDate = false },

@@ -48,7 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.datetime.TimeZone
 import ru.lifety.core.ui.LifetyBottomSheet
-import ru.lifety.core.planner.taskTimingError
+import ru.lifety.core.planner.taskIntervalError
 import ru.lifety.core.time.localDate
 import ru.lifety.core.time.today
 import ru.lifety.core.ui.LifetyIcon
@@ -62,11 +62,14 @@ import ru.lifety.core.ui.PlaceholderScreen
 fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val repository = LocalRepositories.current?.tasks
     if (repository == null) { PlaceholderScreen("Хранилище не подключено", modifier); return }
-    val model = viewModel { TaskEditorViewModel(repository, taskId, initialScheduledAt) }
+    val planning = LocalRepositories.current?.planning
+    val model = viewModel { TaskEditorViewModel(repository, taskId, initialScheduledAt, planning) }
     val state by model.state.collectAsState()
     var now by remember { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); now = Clock.System.now().toEpochMilliseconds() } }
-    val timingError = state.task?.let { taskTimingError(it, now) }
+    val durationRequired = state.hadDetails || state.approach.isNotBlank() || state.goalId != null || state.duration.isNotBlank()
+    val timingError = if (planning != null && durationRequired && state.duration.toIntOrNull()?.let { it in 1..1440 } != true)
+        "Укажите длительность от 1 до 1440 минут" else state.task?.let { taskIntervalError(it, state.duration.toIntOrNull(), now) }
     var confirmDelete by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var closing by remember { mutableStateOf(false) }
@@ -88,7 +91,7 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
                 bottomBar = {
                     if (state.task != null) Surface(color = MaterialTheme.colorScheme.background) {
                         Column {
-                            timingError?.let { Text("Укажите выполнение не позже дедлайна", color = MaterialTheme.colorScheme.error,
+                            timingError?.let { Text(it, color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
                             Button(onClick = model::save, enabled = !state.saving && timingError == null, modifier = Modifier.fillMaxWidth().imePadding().padding(16.dp).height(48.dp)) {
                                 if (state.saving) CircularProgressIndicator(modifier = Modifier.padding(end = 12.dp).size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
@@ -113,20 +116,12 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
                             state.error?.takeUnless { it == timingError || task.title.isBlank() }?.let {
                                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                             }
-                            LocalPlanningState.current.plans[task.id]?.let { plan ->
-                                Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text("План выполнения · ${plan.durationMinutes} мин", style = MaterialTheme.typography.titleMedium)
-                                        Text(plan.approach, style = MaterialTheme.typography.bodyMedium)
-                                        LocalPlanningState.current.goals.find { it.id == plan.goalId }?.let { Text("Цель: ${it.title}", color = MaterialTheme.colorScheme.primary) }
-                                    }
-                                }
-                            }
                             TaskDateTimeField("Дедлайн", "Когда дело должно быть готово. Дата без уточнения времени — до 23:59.",
                                 task.deadlineAt, !state.saving, task.scheduledAt?.let { localDate(it) } ?: today(), true, model::setDeadlineAt)
                             timingError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                             TaskDateTimeField("Когда заняться", "Необязательное время в расписании. Можно оставить только дедлайн.",
                                 task.scheduledAt, !state.saving, task.deadlineAt?.let { localDate(it) } ?: today(), false, model::setScheduledAt)
+                            if (planning != null) TaskDurationFields(state, model)
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("Задача выполнена", style = MaterialTheme.typography.titleMedium)

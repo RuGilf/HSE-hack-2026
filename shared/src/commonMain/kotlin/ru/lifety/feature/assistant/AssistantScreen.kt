@@ -16,6 +16,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -30,7 +32,7 @@ import com.mikepenz.markdown.m3.Markdown
 fun AssistantScreen(modifier: Modifier = Modifier) {
     var api by rememberSaveable { mutableStateOf(false) }
     if (api) ApiAssistantScreen(modifier, onManual = { api = false })
-    else Box(modifier.fillMaxSize().imePadding().padding(bottom = LocalBottomNavigationInset.current), contentAlignment = Alignment.TopCenter) {
+    else Box(modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.TopCenter) {
         PlanTransferContent(Modifier.widthIn(max = 720.dp).fillMaxHeight(), onOpenApi = { api = true })
     }
 }
@@ -49,6 +51,8 @@ private fun ApiAssistantScreen(modifier: Modifier, onManual: () -> Unit) {
     var clearChat by remember { mutableStateOf(false) }
     var input by rememberSaveable { mutableStateOf("") }
     val list = rememberLazyListState()
+    val density = LocalDensity.current
+    var composerHeight by remember { mutableStateOf(120.dp) }
     val focus = LocalFocusManager.current
     LaunchedEffect(controller) { controller.initialize().join() }
     DisposableEffect(controller) { onDispose { controller.close() } }
@@ -57,11 +61,13 @@ private fun ApiAssistantScreen(modifier: Modifier, onManual: () -> Unit) {
     }
     val proposals = state.view.document.proposals.filter { it.status != "rejected" }
     val latestAction = state.view.document.messages.lastOrNull { it.calls.isNotEmpty() }?.calls?.lastOrNull()?.id
-    LaunchedEffect(messages.size, proposals.size, latestAction) {
+    LaunchedEffect(messages.size, proposals.size, latestAction, composerHeight) {
         if (messages.isNotEmpty()) list.animateScrollToItem(messages.size + proposals.size)
     }
     fun send() { if (controller.send(input.trim()) != null) { input = ""; focus.clearFocus() } }
-    Column(modifier.fillMaxSize().imePadding().padding(bottom = ru.lifety.core.ui.LocalBottomNavigationInset.current)) {
+    val bottomInset = LocalBottomNavigationInset.current
+    Box(modifier.fillMaxSize().imePadding()) {
+    Column(Modifier.fillMaxSize()) {
         TextButton(onClick = onManual, enabled = !state.busy, modifier = Modifier.padding(horizontal = 16.dp)) { Text("‹ План с ChatGPT") }
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(if (state.connected) state.credentials.settings.model else "ChatGPT или своя модель", Modifier.weight(1f),
@@ -82,7 +88,7 @@ private fun ApiAssistantScreen(modifier: Modifier, onManual: () -> Unit) {
             }
         }
         if (messages.isEmpty()) {
-            Column(Modifier.weight(1f).fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Column(Modifier.weight(1f).fillMaxWidth().padding(24.dp).padding(bottom = composerHeight + bottomInset), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 LifetyMascot(Modifier.size(100.dp), emotion = LifetyEmotion.Calm)
                 Spacer(Modifier.height(24.dp))
                 Text("С чего начнём?", style = MaterialTheme.typography.headlineSmall)
@@ -96,7 +102,7 @@ private fun ApiAssistantScreen(modifier: Modifier, onManual: () -> Unit) {
                     OutlinedButton(onClick = { input = "Посмотри мои задачи и помоги реалистично спланировать день." }, modifier = Modifier.fillMaxWidth()) { Text("Помоги спланировать день") }
                 }
             }
-        } else LazyColumn(state = list, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        } else LazyColumn(state = list, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = composerHeight + 16.dp + bottomInset), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             items(messages, key = { it.id }, contentType = { it.role }) { message ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.role == "user") Arrangement.End else Arrangement.Start) {
                     if (message.role == "user") Surface(color = MaterialTheme.colorScheme.secondaryContainer,
@@ -110,6 +116,8 @@ private fun ApiAssistantScreen(modifier: Modifier, onManual: () -> Unit) {
             }
             item(key = "activity") { AgentActivity(state.view.document.messages, state.busy) }
         }
+    }
+    Column(Modifier.align(Alignment.BottomCenter).padding(bottom = bottomInset).onSizeChanged { composerHeight = with(density) { it.height.toDp() } }) {
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
         (state.error ?: state.view.error)?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -120,6 +128,7 @@ private fun ApiAssistantScreen(modifier: Modifier, onManual: () -> Unit) {
             else Button(onClick = ::send, enabled = state.connected && input.isNotBlank(), modifier = Modifier.heightIn(min = 56.dp)) { Text("Отправить") }
         }
         if (messages.isNotEmpty()) TextButton(onClick = { clearChat = true }, enabled = !state.busy, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Новый разговор") }
+    }
     }
     if (settings) AgentSettingsSheet(state, controller, openTransfer = { settings = false; onManual() }) { settings = false }
     if (saved) SavedAgentSheet(state, controller) { saved = false }

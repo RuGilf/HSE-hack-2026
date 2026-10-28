@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ru.lifety.core.appearance.*
 import ru.lifety.core.ui.*
+import ru.lifety.core.security.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("UNUSED_PARAMETER") // Kept for source compatibility; finance has its own tab.
@@ -34,8 +35,11 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
     val scope = rememberCoroutineScope()
     val controller = LocalAppearance.current ?: return
     val state by controller.state.collectAsState()
+    var security by remember { mutableStateOf(false) }
+    val lockState = LocalSectionLockState.current
     LaunchedEffect(controller) { controller.refreshIcon() }
     LifetyBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, contentColor = MaterialTheme.colorScheme.onSurface) {
+        if (security) SectionLockSettingsContent(onBack = { security = false }) else {
         Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.CenterHorizontally)
             .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -45,6 +49,13 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
                     Text("Ваш Lifety", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = { scope.launch { sheet.hide(); onDismiss() } }, modifier = Modifier.semantics { contentDescription = "Закрыть настройки" }) { LifetyIcon(LifetySymbol.Close) }
+            }
+            OutlinedCard(onClick = { security = true }, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Код-пароль на разделы", style = MaterialTheme.typography.titleMedium)
+                    Text(if (lockState.configuration.enabled) "Защищено разделов: ${lockState.configuration.sections.size}" else "Выберите, какие разделы защищать",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Тема", style = MaterialTheme.typography.titleMedium)
@@ -87,6 +98,7 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
                     Text("Задачи, цели, люди, расходы и здоровье хранятся локально. Доступ агента к данным настраивается в ассистенте.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
         }
     }
 }

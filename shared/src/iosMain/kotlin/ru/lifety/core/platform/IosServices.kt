@@ -9,6 +9,11 @@ interface IosCredentialStorage {
 }
 data class IosSecretResult(val value: String?, val error: String?)
 
+interface IosSectionLockStorage : IosCredentialStorage {
+    fun createSalt(): IosSecretResult
+    fun derivePin(pin: String, salt: String): IosSecretResult
+}
+
 /** HealthKit deliberately does not reveal whether a read permission was denied. */
 interface IosHealthSource {
     val available: Boolean
@@ -20,4 +25,5 @@ interface IosHealthSource {
 object IosServices {
     var credentials: IosCredentialStorage? = null
     var health: IosHealthSource? = null
+    var sectionLocks: IosSectionLockStorage? = null
 }

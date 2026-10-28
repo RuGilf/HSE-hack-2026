@@ -16,6 +16,36 @@ import kotlin.time.Instant
 import kotlin.test.*
 
 class PlanningPersistenceTest {
+    @Test fun manuallyEditedIntervalsAndStepsPersistTogetherAndRejectInvalidChanges() = runBlocking {
+        val path = Files.createTempFile("lifety-manual-plan-", ".db")
+        val start = Instant.parse("2030-10-28T09:00:00Z").toEpochMilliseconds()
+        try {
+            val driver = JdbcSqliteDriver("jdbc:sqlite:$path"); LifetyDatabase.Schema.create(driver)
+            AppContainer(driver).use { app ->
+                val repo = app.repositories.planning!!
+                app.repositories.goals!!.upsert(Goal("g", "Диплом"))
+                val task = Task("t", "Подготовить материалы", start, start + 90 * 60_000, false)
+                repo.saveTask(task, TaskPlan("t", 60, "Найти источники\nСоставить план", "g"))
+                val before = repo.snapshot()
+                assertFailsWith<IllegalArgumentException> { repo.saveTask(task.copy(title = "Не должно сохраниться"), TaskPlan("t", 120)) }
+                assertEquals(before, repo.snapshot())
+                assertFailsWith<IllegalArgumentException> { repo.saveTask(task, TaskPlan("wrong-id", 30)) }
+                assertEquals(before, repo.snapshot())
+            }
+            AppContainer(JdbcSqliteDriver("jdbc:sqlite:$path")).use { app ->
+                val repo = app.repositories.planning!!
+                val snapshot = repo.snapshot()
+                assertEquals(start, snapshot.tasks.single().scheduledAt)
+                assertEquals(60, snapshot.details.single().durationMinutes)
+                assertEquals("g", snapshot.details.single().goalId)
+                assertEquals("Найти источники\nСоставить план", snapshot.details.single().approach)
+                repo.saveTask(snapshot.tasks.single().copy(scheduledAt = null), snapshot.details.single())
+                assertNull(app.repositories.tasks.observeAll().first().single().scheduledAt)
+                assertEquals(60, repo.observeAll().first().single().durationMinutes)
+            }
+        } finally { Files.deleteIfExists(path) }
+    }
+
     private val now = Instant.parse("2026-10-27T09:00:00Z").toEpochMilliseconds()
     private fun plan(s: PlanSnapshot) = ImportedPlan("lifety-plan-v1", snapshotFingerprint(s), "Работаем по шагам",
         s.tasks.filterNot { it.isCompleted }.mapIndexed { i, t -> PlannedTask(t.id, Instant.fromEpochMilliseconds(now + (i + 1) * 3_600_000L).toString(), 30, "Шаг 1: изучить материалы", "g") })

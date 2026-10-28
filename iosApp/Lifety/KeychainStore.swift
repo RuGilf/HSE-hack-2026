@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import CommonCrypto
 import LifetyShared
 
 final class KeychainStore: IosCredentialStorage {
@@ -30,5 +31,32 @@ final class KeychainStore: IosCredentialStorage {
         if updated == errSecSuccess { return true }
         guard updated == errSecItemNotFound else { return false }
         return SecItemAdd(query.merging(attributes) { _, new in new } as CFDictionary, nil) == errSecSuccess
+    }
+}
+
+final class SectionLockStorage: IosSectionLockStorage {
+    private let storage = KeychainStore(service: "ru.lifety.ios.section-lock")
+    func read() -> IosSecretResult { storage.read() }
+    func write(value: String) -> Bool { storage.write(value: value) }
+    func createSalt() -> IosSecretResult {
+        var bytes = [UInt8](repeating: 0, count: 16)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+            return IosSecretResult(value: nil, error: "Secure randomness unavailable")
+        }
+        return IosSecretResult(value: Data(bytes).base64EncodedString(), error: nil)
+    }
+    func derivePin(pin: String, salt: String) -> IosSecretResult {
+        guard let saltData = Data(base64Encoded: salt), saltData.count == 16 else {
+            return IosSecretResult(value: nil, error: "Invalid salt")
+        }
+        var derived = [UInt8](repeating: 0, count: 32)
+        let password = Array(pin.utf8)
+        let status = password.withUnsafeBytes { p in saltData.withUnsafeBytes { s in
+            CCKeyDerivationPBKDF(CCPBKDFAlgorithm(kCCPBKDF2), p.baseAddress?.assumingMemoryBound(to: Int8.self), password.count,
+                s.baseAddress?.assumingMemoryBound(to: UInt8.self), saltData.count, CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1),
+                1_300_000, &derived, 32)
+        } }
+        guard status == kCCSuccess else { return IosSecretResult(value: nil, error: "Key derivation failed") }
+        return IosSecretResult(value: Data(derived).base64EncodedString(), error: nil)
     }
 }

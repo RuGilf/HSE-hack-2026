@@ -67,10 +67,17 @@ import ru.lifety.feature.dashboard.DashboardScreen
 import ru.lifety.feature.finance.FinanceScreen
 import ru.lifety.feature.health.HealthScreen
 import ru.lifety.feature.tasks.TaskEditorScreen
+import ru.lifety.core.security.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LifetyApp(repositories: Repositories? = null) {
+    SectionLockProvider { LifetyContent(repositories) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LifetyContent(repositories: Repositories?) {
     val controller = rememberNavController()
     val entry by controller.currentBackStackEntryAsState()
     val isEditor = entry?.destination?.hasRoute<TaskEditorRoute>() == true
@@ -79,6 +86,8 @@ fun LifetyApp(repositories: Repositories? = null) {
     val density = LocalDensity.current
     val keyboardVisible by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
     var settings by rememberSaveable { mutableStateOf(false) }
+    val lockState = LocalSectionLockState.current
+    var settingsEpoch by remember { mutableStateOf(lockState.epoch) }
     var planRoute by rememberSaveable { mutableStateOf(AppDestination.TASKS.route) }
     val navigator = remember(controller) {
         RootNavigator(onNavigate = { destination ->
@@ -120,7 +129,7 @@ fun LifetyApp(repositories: Repositories? = null) {
                                     if (section == AppDestination.DASHBOARD) LifetyMascot(Modifier.padding(start = 12.dp).size(32.dp), animated = false)
                                 },
                                 actions = {
-                                    IconButton(onClick = { settings = true }, modifier = Modifier.semantics { contentDescription = "Настройки" }) {
+                                    IconButton(onClick = { settingsEpoch = lockState.epoch; settings = true }, modifier = Modifier.semantics { contentDescription = "Настройки" }) {
                                         LifetyIcon(LifetySymbol.Settings, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 },
@@ -139,12 +148,12 @@ fun LifetyApp(repositories: Repositories? = null) {
                             popEnterTransition = { fadeIn(tween(LifetyMotion.Standard)) },
                             popExitTransition = { fadeOut(tween(LifetyMotion.Quick)) },
                         ) {
-                            composable(AppDestination.DASHBOARD.route) { DashboardScreen(Modifier.fillMaxSize()) }
-                            composable(AppDestination.TASKS.route) { PlanScreen(modifier = Modifier.fillMaxSize()) }
-                            composable(AppDestination.CALENDAR.route) { PlanScreen(initialCalendar = true, modifier = Modifier.fillMaxSize()) }
-                            composable(AppDestination.FINANCE.route) { FinanceScreen(Modifier.fillMaxSize()) }
-                            composable(AppDestination.ASSISTANT.route) { AssistantScreen(Modifier.fillMaxSize()) }
-                            composable(AppDestination.HEALTH.route) { HealthScreen(Modifier.fillMaxSize()) }
+                            composable(AppDestination.DASHBOARD.route) { SectionGuard("dashboard") { DashboardScreen(Modifier.fillMaxSize()) } }
+                            composable(AppDestination.TASKS.route) { SectionGuard("tasks") { PlanScreen(modifier = Modifier.fillMaxSize()) } }
+                            composable(AppDestination.CALENDAR.route) { SectionGuard("calendar") { PlanScreen(initialCalendar = true, modifier = Modifier.fillMaxSize()) } }
+                            composable(AppDestination.FINANCE.route) { SectionGuard("finance") { FinanceScreen(Modifier.fillMaxSize()) } }
+                            composable(AppDestination.ASSISTANT.route) { SectionGuard("assistant") { AssistantScreen(Modifier.fillMaxSize()) } }
+                            composable(AppDestination.HEALTH.route) { SectionGuard("health") { HealthScreen(Modifier.fillMaxSize()) } }
                             composable<TaskEditorRoute>(
                                 enterTransition = { EnterTransition.None },
                                 exitTransition = { ExitTransition.None },
@@ -152,7 +161,7 @@ fun LifetyApp(repositories: Repositories? = null) {
                                 popExitTransition = { ExitTransition.None },
                             ) { backStackEntry ->
                                 val editor = backStackEntry.toRoute<TaskEditorRoute>()
-                                TaskEditorScreen(editor.taskId, editor.scheduledAt, onClose = { controller.popBackStack() })
+                                SectionGuard("tasks", onBack = { controller.popBackStack() }) { TaskEditorScreen(editor.taskId, editor.scheduledAt, onClose = { controller.popBackStack() }) }
                             }
                         }
                     }
@@ -160,7 +169,7 @@ fun LifetyApp(repositories: Repositories? = null) {
                         PlatformNavigationBar(section, selectSection)
                     }
                 }
-                if (settings) LifetySettingsSheet(onDismiss = { settings = false }, onFinance = {
+                if (settings && settingsEpoch == lockState.epoch) LifetySettingsSheet(onDismiss = { settings = false }, onFinance = {
                     settings = false
                     navigator.navigate(AppDestination.FINANCE)
                 })

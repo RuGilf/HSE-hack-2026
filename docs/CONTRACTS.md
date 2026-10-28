@@ -660,3 +660,27 @@ interface PersonRepository {
 - Private conversation URL необязателен; только HTTPS chatgpt.com/c/... либо
   /g/.../c/..., без автопубликации, без чтения чужого чата. Детали и QA:
   [CHATGPT_PLANNING.md](CHATGPT_PLANNING.md).
+
+## Блокировка разделов / ручное расписание — 28 октября
+
+- `core/security/SectionLockController.kt`: internal SectionLockPlatform,
+  LockConfiguration / SectionLockState / SectionLockController. UI provider и
+  guard — `SectionLockUi.kt`; Android/iOS actual adapters в зеркальных пакетах.
+  Пять primary route IDs; calendar и task editor относятся к tasks.
+  Dashboard/Assistant требуют код также при защите tasks/finance/health.
+- Root `SectionLockProvider` владеет общим session state, route bodies обёрнуты
+  в `SectionGuard`. В репозитории и модельные DTO код/конфигурация не добавляются.
+  iOS host подключает `IosServices.sectionLocks: IosSectionLockStorage?` через
+  `SectionLockStorage`, существующий API credentials хранится отдельно.
+  Настройка защиты — в прежнем LifetySettingsSheet, без новых primary routes.
+- PlanningRepository дополнен `suspend saveTask(task: Task, details: TaskPlan?)`
+  с default UnsupportedOperationException для совместимости существующих fake
+  implementations. SQLDelight implementation атомарно валидирует и сохраняет
+  Task + TaskPlan, сохраняя прежнюю schema v5. Старые методы и модели не меняются.
+- TaskEditorViewModel принимает optional PlanningRepository; редактор отображает
+  и сохраняет длительность, шаги и goalId. Таймлайн не придумывает длительность;
+  общий алгоритм — `core/planner/DayTimeline.kt`. Часовой пояс/DST учитываются.
+- AssistantScreen сохраняет signature; его scroll content заполняет пространство
+  под native tab bar, inset находится в content padding. API composer — overlay.
+  Детальные ограничения/проверки: [SECTION_LOCKS.md](SECTION_LOCKS.md),
+  [TIME_PLANNING.md](TIME_PLANNING.md).

@@ -70,7 +70,7 @@ internal fun PlanTransferContent(modifier: Modifier = Modifier, onBusyChanged: (
     val pendingWithoutDraft = draft == null && sent?.awaitingReply == true
     val changes = state.snapshot?.let { contextChanges(compactBaseline(it), sent?.baseline) }
     LazyColumn(modifier.widthIn(max = 720.dp).fillMaxWidth(), state = list,
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp + LocalBottomNavigationInset.current), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item(key = "header") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LifetyMascot(Modifier.size(40.dp), emotion = LifetyEmotion.Calm, animated = false)
