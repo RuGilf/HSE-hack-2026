@@ -615,17 +615,20 @@ interface PersonRepository {
 
 ## Настройки внешнего вида
 
-- `core/appearance/LifetyPalette.kt`: five stable IDs (lifety, tokyo-night,
-  catppuccin, gruvbox, nord), ThemePalette и имена alternate icons.
+- `core/appearance/LifetyPalette.kt`: восемь stable IDs (lifety, tokyo-night,
+  catppuccin, gruvbox, nord, lifety-light, catppuccin-latte, gruvbox-light),
+  ThemePalette с вычисляемым isDark и имена alternate icons. Три последних — светлые.
 - `LifetyTheme(content)` сохраняет сигнатуру; платформа восстанавливает тему
   из SharedPreferences/NSUserDefaults и предоставляет internal LocalAppearance.
   SQL schema v4, repository/model/navigation contracts не меняются.
 - `LifetySettingsSheet(onDismiss, onFinance)` сохраняет сигнатуру для совместимости;
   onFinance больше не вызывается, финансового пункта в настройках нет.
 - Нативный UITabBar и LifetyMascot используют текущую Material-палитру.
-- iOS alternate sets: AppIconTokyoNight, AppIconCatppuccin, AppIconGruvbox, AppIconNord;
+- iOS alternate sets: AppIconTokyoNight, AppIconCatppuccin, AppIconGruvbox, AppIconNord,
+  AppIconLifetyLight, AppIconCatppuccinLatte, AppIconGruvboxLight;
   null — основной AppIcon. Android launcher aliases: .LauncherLifety,
-  .LauncherTokyoNight, .LauncherCatppuccin, .LauncherGruvbox, .LauncherNord.
+  .LauncherTokyoNight, .LauncherCatppuccin, .LauncherGruvbox, .LauncherNord,
+  .LauncherLifetyLight, .LauncherCatppuccinLatte, .LauncherGruvboxLight.
   Target MainActivity остаётся включённой; LAUNCHER intent перенесён на aliases.
 - Иконка меняется только по отдельной кнопке. UI читает фактическое состояние ОС,
   обработка ошибок не выдаёт неудачу за успешный выбор. Источники/лицензии,

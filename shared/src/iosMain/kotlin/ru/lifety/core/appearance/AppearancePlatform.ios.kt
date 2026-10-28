@@ -33,6 +33,9 @@ internal fun Color.toUiColor() = UIColor(red = red.toDouble(), green = green.toD
 @Composable internal actual fun ApplyPlatformAppearance(palette: ThemePalette) {
     val host = LocalUIViewController.current
     SideEffect {
+        val style = if (palette.isDark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
+        host.overrideUserInterfaceStyle = style
+        host.view.window?.overrideUserInterfaceStyle = style
         host.view.backgroundColor = palette.background.toUiColor()
         host.view.window?.backgroundColor = palette.background.toUiColor()
         host.view.tintColor = palette.accent.toUiColor()

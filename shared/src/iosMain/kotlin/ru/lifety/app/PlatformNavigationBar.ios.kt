@@ -4,6 +4,7 @@ package ru.lifety.app
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.luminance
 import ru.lifety.core.appearance.toUiColor
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitView
@@ -20,6 +21,7 @@ import ru.lifety.core.ui.LocalBottomNavigationInset
 internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (AppDestination) -> Unit) {
     val accent = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val currentSelect by rememberUpdatedState(onSelect)
     val delegate = remember { object : NSObject(), UITabBarDelegateProtocol {
         override fun tabBar(tabBar: UITabBar, didSelectItem: UITabBarItem) {
@@ -40,7 +42,6 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
                 val appearance = UITabBarAppearance().apply { configureWithDefaultBackground() }
                 standardAppearance = appearance
                 scrollEdgeAppearance = appearance
-                overrideUserInterfaceStyle = UIUserInterfaceStyle.UIUserInterfaceStyleDark
                 backgroundColor = UIColor.clearColor
                 opaque = false
             }
@@ -48,6 +49,7 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
             properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.NonCooperative,
                 isNativeAccessibilityEnabled = true, placedAsOverlay = true), update = { bar ->
             bar.tintColor = accent.toUiColor()
+            bar.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
             bar.unselectedItemTintColor = secondary.toUiColor()
             bar.selectedItem = items[primarySections.indexOf(selected).coerceAtLeast(0)]
         })

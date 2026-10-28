@@ -6,6 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.UIKitView
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
@@ -23,6 +24,7 @@ import ru.lifety.core.time.today
 @Composable
 internal actual fun BirthdayPickerDialog(initial: BirthdaySelection?, onConfirm: (BirthdaySelection) -> Unit, onDismiss: () -> Unit) {
     val currentDay = today()
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     var day by rememberSaveable { mutableStateOf(initial?.day ?: currentDay.day) }
     var month by rememberSaveable { mutableStateOf(initial?.month ?: currentDay.month.number) }
     var year by rememberSaveable { mutableStateOf(initial?.year) }
@@ -69,12 +71,12 @@ internal actual fun BirthdayPickerDialog(initial: BirthdaySelection?, onConfirm:
                 UIKitView(factory = {
                     UIPickerView().apply {
                         this.dataSource = delegate; this.delegate = delegate
-                        overrideUserInterfaceStyle = UIUserInterfaceStyle.UIUserInterfaceStyleDark
                         backgroundColor = UIColor.clearColor
                     }
                 }, modifier = Modifier.fillMaxWidth().height(216.dp),
                     properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.NonCooperative, isNativeAccessibilityEnabled = true, placedAsOverlay = true),
                     update = { picker ->
+                        picker.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
                         picker.reloadComponent(0)
                         val rows = listOf((day - 1).toLong(), (month - 1).toLong(), year?.let { (currentDay.year - it + 1).toLong() } ?: 0L)
                         rows.forEachIndexed { index, row -> if (picker.selectedRowInComponent(index.toLong()) != row) picker.selectRow(row, index.toLong(), animated = false) }

@@ -24,9 +24,11 @@ class AppearanceControllerTest {
     @Test fun savedThemeRestoresWithoutChangingIcon() = runBlocking {
         val platform = Platform()
         val controller = AppearanceController(platform, this)
-        controller.selectTheme(LifetyPalette.Catppuccin)
-        controller.state.first { !it.savingTheme }
-        assertEquals(LifetyPalette.Catppuccin, AppearanceController(platform, this).state.value.theme)
+        LifetyPalette.entries.forEach { theme ->
+            controller.selectTheme(theme)
+            controller.state.first { !it.savingTheme }
+            assertEquals(theme, AppearanceController(platform, this).state.value.theme)
+        }
         assertEquals(LifetyPalette.Lifety, platform.icon)
         assertEquals(0, platform.iconCalls)
     }

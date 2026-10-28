@@ -237,7 +237,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconTokyoNight AppIconCatppuccin AppIconGruvbox AppIconNord";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconTokyoNight AppIconCatppuccin AppIconGruvbox AppIconNord AppIconLifetyLight AppIconCatppuccinLatte AppIconGruvboxLight";
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Lifety/Lifety.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -257,7 +257,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconTokyoNight AppIconCatppuccin AppIconGruvbox AppIconNord";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconTokyoNight AppIconCatppuccin AppIconGruvbox AppIconNord AppIconLifetyLight AppIconCatppuccinLatte AppIconGruvboxLight";
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Lifety/Lifety.entitlements;
 				CODE_SIGN_STYLE = Automatic;

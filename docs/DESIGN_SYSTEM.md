@@ -23,12 +23,13 @@ Design update: 25 октября 2026. Android polish на базе main `2518b8
 `shared/src/commonMain/kotlin/ru/lifety/core/ui/LifetyDesign.kt`.
 `LifetyTheme.kt` назначает все роли Material 3, включая secondaryContainer и
 surface containers: стандартный фиолетовый акцент не должен возвращаться.
-Тема выбирается в настройках: Lifety, Tokyo Night, Catppuccin Mocha, Gruvbox Dark, Nord.
-Все варианты тёмные; локальные темы feature-экраны не создают. Источник палитр —
+Тема выбирается в настройках: светлые Lifety Light, Catppuccin Latte, Gruvbox Light;
+тёмные Lifety, Tokyo Night, Catppuccin Mocha, Gruvbox Dark, Nord.
+Локальные темы feature-экраны не создают. Источник палитр —
 `core/appearance/LifetyPalette.kt`, Material-роли — `LifetyTheme.kt`.
-Primary/secondary containers тёмные: selected chips и tonal controls не превращаются
-в большие неоновые плашки. Цвет content каждой роли соответствует её назначению.
-Android system bars сохраняют светлые значки на тёмном фоне. Системный splash
+Primary/secondary containers мягко тонированы: selected chips и tonal controls
+не превращаются в большие неоновые плашки. Цвет content каждой роли соответствует её назначению.
+Android system bars меняют яркость значков вместе с темой. Системный splash
 использует исходный фон; launcher mark меняется отдельным действием в настройках.
 
 Внутри функций используйте `MaterialTheme.colorScheme`, `shapes`, `typography`.
@@ -102,7 +103,7 @@ Top app bar использует titleLarge 22 sp; нижние подписи �
   пропуски различаются; средние только по известным дням. Ручная форма с датой —
   ModalBottomSheet, IME Next/Done, сохранение черновика и Snackbar после записи.
   Импорт раскрывается отдельно; график проявляется за 240 ms без задержки данных.
-- Настройки открываются шестерёнкой в верхней панели: карточки пяти тем с
+- Настройки открываются шестерёнкой в верхней панели: карточки восьми тем с
   предпросмотром, отдельная смена иконки в цвет выбранной темы, локальные данные.
   Пункт финансов/банковских уведомлений удалён. Подробности — [APPEARANCE.md](APPEARANCE.md).
 - `core/ui/LifetyIcon.kt`: общие vector symbols для нижней панели и действий.
@@ -231,6 +232,10 @@ FAB и ModalBottomSheet. Инициалы вычисляются из имени
 Смена темы не меняет значок сама: явная кнопка применяет соответствующий alternate
 icon (iOS) / launcher alias (Android). Ошибка ОС не меняет выбранную тему.
 Палитры адаптированы под контраст текста 4.5:1; размеры и типографика общие.
+Светлые и тёмные варианты сгруппированы в настройках. На iOS стиль системных
+значков, UITabBar и колёсиков даты соответствует теме. Тема сохраняется через
+прежний ключ; её смена не меняет иконку автоматически. У светлых вариантов свои
+alternate icons. Системная тема устройства не подменяет явный выбор пользователя.
 
 ## Ассистент для ручного обмена
 

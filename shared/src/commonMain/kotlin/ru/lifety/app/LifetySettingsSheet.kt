@@ -51,10 +51,13 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
                 Text("Палитры из мира Neovim. Применяются сразу.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                LifetyPalette.entries.chunked(2).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        row.forEach { theme -> ThemeTile(theme, state.theme == theme, !state.savingTheme, Modifier.weight(1f)) { controller.selectTheme(theme) } }
-                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                listOf(false to "Светлые", true to "Тёмные").forEach { (dark, title) ->
+                    Text(title, style = MaterialTheme.typography.titleSmall)
+                    LifetyPalette.entries.filter { it.palette.isDark == dark }.chunked(2).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            row.forEach { theme -> ThemeTile(theme, state.theme == theme, !state.savingTheme, Modifier.weight(1f)) { controller.selectTheme(theme) } }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }

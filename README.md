@@ -119,7 +119,8 @@ iOS Simulator arm64 compile — успешны. Результаты ниже, �
 
 ## Темы и иконка
 
-В настройках доступны Lifety, Tokyo Night, Catppuccin Mocha, Gruvbox Dark и Nord.
+В настройках доступны светлые Lifety Light, Catppuccin Latte, Gruvbox Light
+и тёмные Lifety, Tokyo Night, Catppuccin Mocha, Gruvbox Dark, Nord.
 Тема меняется сразу и сохраняется на устройстве. Кнопка «Применить иконку …»
 отдельно меняет системный значок на вариант в цвет темы; есть возврат к исходному.
 Пункт финансов из общих настроек убран. Подробнее — [docs/APPEARANCE.md](docs/APPEARANCE.md).

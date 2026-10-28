@@ -3,6 +3,7 @@ import LifetyShared
 
 @main
 struct LifetyIosApp: App {
+    @AppStorage("lifety.appearance.theme") private var themeId = "lifety"
     init() {
         IosServices.shared.credentials = KeychainStore()
         IosServices.shared.health = AppleHealthSource()
@@ -14,7 +15,7 @@ struct LifetyIosApp: App {
                 Color("LaunchBackground").ignoresSafeArea()
                 LifetyRoot().ignoresSafeArea()
             }
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(LifetyPalette.companion.fromId(id: themeId).palette.isDark ? .dark : .light)
         }
     }
 }

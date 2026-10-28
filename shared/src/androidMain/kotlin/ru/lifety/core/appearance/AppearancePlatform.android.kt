@@ -2,11 +2,17 @@ package ru.lifety.core.appearance
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
+import android.graphics.Color
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import kotlinx.coroutines.*
 
 private class AndroidAppearance(private val context: Context) : AppearancePlatform {
@@ -48,4 +54,17 @@ private var controller: AppearanceController? = null
     val context = LocalContext.current.applicationContext
     return remember(context) { controller ?: AppearanceController(AndroidAppearance(context), CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)).also { controller = it } }
 }
-@Composable internal actual fun ApplyPlatformAppearance(palette: ThemePalette) = Unit
+@Composable internal actual fun ApplyPlatformAppearance(palette: ThemePalette) {
+    val context = LocalContext.current
+    val activity = remember(context) {
+        generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+            .filterIsInstance<ComponentActivity>().firstOrNull()
+    }
+    LaunchedEffect(activity, palette.isDark) {
+        val dark = SystemBarStyle.dark(Color.TRANSPARENT)
+        activity?.enableEdgeToEdge(
+            statusBarStyle = if (palette.isDark) dark else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = if (palette.isDark) dark else SystemBarStyle.light(Color.TRANSPARENT, 0xFF1B1B1B.toInt()),
+        )
+    }
+}

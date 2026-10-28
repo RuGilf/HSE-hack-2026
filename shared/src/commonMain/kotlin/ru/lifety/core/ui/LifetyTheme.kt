@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Color
@@ -20,9 +21,10 @@ internal fun LifetyPalette.colorScheme(): androidx.compose.material3.ColorScheme
     val error = readableOn(p.error, p.raised, p.text)
     val primaryContainer = if (this == LifetyPalette.Lifety) LifetyColors.PrimaryContainer else lerp(p.background, p.accent, 0.16f)
     val secondaryContainer = if (this == LifetyPalette.Lifety) LifetyColors.SecondaryContainer else lerp(p.surface, p.accent, 0.10f)
-    return darkColorScheme(
+    val base = if (p.isDark) darkColorScheme() else lightColorScheme()
+    return base.copy(
         primary = accent, onPrimary = p.background,
-        primaryContainer = primaryContainer, onPrimaryContainer = p.text, inversePrimary = accent,
+        primaryContainer = primaryContainer, onPrimaryContainer = p.text, inversePrimary = readableOn(p.accent, p.text, p.background),
         secondary = accent, onSecondary = p.background,
         secondaryContainer = secondaryContainer, onSecondaryContainer = p.text,
         tertiary = accent, onTertiary = p.background,
@@ -30,7 +32,7 @@ internal fun LifetyPalette.colorScheme(): androidx.compose.material3.ColorScheme
         background = p.background, onBackground = p.text,
         surface = p.background, onSurface = p.text,
         surfaceVariant = p.surface, onSurfaceVariant = muted, surfaceTint = accent,
-        surfaceDim = p.background, surfaceBright = p.raised,
+        surfaceDim = if (p.isDark) p.background else p.raised, surfaceBright = if (p.isDark) p.raised else p.surface,
         surfaceContainerLowest = p.background, surfaceContainerLow = p.surface,
         surfaceContainer = p.surface, surfaceContainerHigh = p.surface, surfaceContainerHighest = p.raised,
         outline = p.outline, outlineVariant = p.outline.copy(alpha = 0.6f),
@@ -41,12 +43,14 @@ internal fun LifetyPalette.colorScheme(): androidx.compose.material3.ColorScheme
 }
 
 /** Editor syntax colors need a little more contrast when used for small interface text. */
-private fun readableOn(color: Color, background: Color, light: Color): Color {
+private fun readableOn(color: Color, background: Color, text: Color): Color {
     for (step in 0..20) {
-        val candidate = lerp(color, light, step / 20f)
-        if ((candidate.luminance() + .05f) / (background.luminance() + .05f) >= 4.5f) return candidate
+        val candidate = lerp(color, text, step / 20f)
+        val contrast = (maxOf(candidate.luminance(), background.luminance()) + .05f) /
+            (minOf(candidate.luminance(), background.luminance()) + .05f)
+        if (contrast >= 4.5f) return candidate
     }
-    return light
+    return text
 }
 
 private val shapes = Shapes(

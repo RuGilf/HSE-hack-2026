@@ -57,6 +57,30 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <activity-alias android:name=".LauncherLifetyLight" android:targetActivity=".MainActivity"
+            android:enabled="false" android:exported="true"
+            android:icon="@drawable/ic_lifety_lifety_light" android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".LauncherCatppuccinLatte" android:targetActivity=".MainActivity"
+            android:enabled="false" android:exported="true"
+            android:icon="@drawable/ic_lifety_catppuccin_latte" android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".LauncherGruvboxLight" android:targetActivity=".MainActivity"
+            android:enabled="false" android:exported="true"
+            android:icon="@drawable/ic_lifety_gruvbox_light" android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <activity
             android:name="ru.lifety.feature.health.HealthPermissionsRationaleActivity"
             android:exported="true">
