@@ -3,6 +3,8 @@ package ru.lifety.app
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
+import androidx.compose.material3.MaterialTheme
+import ru.lifety.core.appearance.toUiColor
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitView
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
@@ -16,6 +18,8 @@ import ru.lifety.core.ui.LocalBottomNavigationInset
 /** UIKit supplies SF Symbols, VoiceOver selection and the native tab-bar appearance. */
 @Composable
 internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (AppDestination) -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
     val currentSelect by rememberUpdatedState(onSelect)
     val delegate = remember { object : NSObject(), UITabBarDelegateProtocol {
         override fun tabBar(tabBar: UITabBar, didSelectItem: UITabBarItem) {
@@ -33,8 +37,6 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
             UITabBar().apply {
                 this.delegate = delegate
                 setItems(items, animated = false)
-                tintColor = UIColor(red = 53.0 / 255, green = 239.0 / 255, blue = 112.0 / 255, alpha = 1.0)
-                unselectedItemTintColor = UIColor.secondaryLabelColor
                 val appearance = UITabBarAppearance().apply { configureWithDefaultBackground() }
                 standardAppearance = appearance
                 scrollEdgeAppearance = appearance
@@ -45,6 +47,8 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
         }, modifier = Modifier.fillMaxWidth().height(LocalBottomNavigationInset.current),
             properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.NonCooperative,
                 isNativeAccessibilityEnabled = true, placedAsOverlay = true), update = { bar ->
+            bar.tintColor = accent.toUiColor()
+            bar.unselectedItemTintColor = secondary.toUiColor()
             bar.selectedItem = items[primarySections.indexOf(selected).coerceAtLeast(0)]
         })
     }

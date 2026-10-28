@@ -612,3 +612,21 @@ interface PersonRepository {
   поля Task и обязательные публичные screen signatures не меняются.
 - Агент с tasks scope экспортирует актуальные goals/taskPlans/report вместе с tasks
   перед запросом; без scope эти данные удаляются из generated workspace.
+
+## Настройки внешнего вида
+
+- `core/appearance/LifetyPalette.kt`: five stable IDs (lifety, tokyo-night,
+  catppuccin, gruvbox, nord), ThemePalette и имена alternate icons.
+- `LifetyTheme(content)` сохраняет сигнатуру; платформа восстанавливает тему
+  из SharedPreferences/NSUserDefaults и предоставляет internal LocalAppearance.
+  SQL schema v4, repository/model/navigation contracts не меняются.
+- `LifetySettingsSheet(onDismiss, onFinance)` сохраняет сигнатуру для совместимости;
+  onFinance больше не вызывается, финансового пункта в настройках нет.
+- Нативный UITabBar и LifetyMascot используют текущую Material-палитру.
+- iOS alternate sets: AppIconTokyoNight, AppIconCatppuccin, AppIconGruvbox, AppIconNord;
+  null — основной AppIcon. Android launcher aliases: .LauncherLifety,
+  .LauncherTokyoNight, .LauncherCatppuccin, .LauncherGruvbox, .LauncherNord.
+  Target MainActivity остаётся включённой; LAUNCHER intent перенесён на aliases.
+- Иконка меняется только по отдельной кнопке. UI читает фактическое состояние ОС,
+  обработка ошибок не выдаёт неудачу за успешный выбор. Источники/лицензии,
+  платформенные ограничения и результаты — [APPEARANCE.md](APPEARANCE.md).
