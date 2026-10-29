@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import platform.darwin.NSObject
 import platform.UIKit.*
 import ru.lifety.app.navigation.AppDestination
+import ru.lifety.app.navigation.LocalNavigationItems
 import ru.lifety.core.ui.LocalBottomNavigationInset
 
 /** UIKit supplies SF Symbols, VoiceOver selection and the native tab-bar appearance. */
@@ -23,14 +24,20 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val currentSelect by rememberUpdatedState(onSelect)
+    val destinations = LocalNavigationItems.current
+    val currentDestinations by rememberUpdatedState(destinations)
     val delegate = remember { object : NSObject(), UITabBarDelegateProtocol {
         override fun tabBar(tabBar: UITabBar, didSelectItem: UITabBarItem) {
-            primarySections.getOrNull(didSelectItem.tag.toInt())?.let { currentSelect(it) }
+            AppDestination.entries.getOrNull(didSelectItem.tag.toInt())?.takeIf { it in currentDestinations }?.let { currentSelect(it) }
         }
     } }
-    val symbols = listOf("house", "checklist", "creditcard", "heart", "bubble.left.and.bubble.right")
-    val items = remember { primarySections.mapIndexed { index, destination ->
-        UITabBarItem(title = destination.title, image = UIImage.systemImageNamed(symbols[index]), tag = index.toLong()).apply {
+    val items = remember(destinations) { destinations.map { destination ->
+        val symbol = when (destination) {
+            AppDestination.DASHBOARD -> "house"; AppDestination.TASKS -> "checklist"; AppDestination.FINANCE -> "creditcard"
+            AppDestination.HEALTH -> "heart"; AppDestination.ASSISTANT -> "bubble.left.and.bubble.right"
+            AppDestination.CALENDAR -> "calendar"; AppDestination.PEOPLE -> "person.2"
+        }
+        UITabBarItem(title = destination.title, image = UIImage.systemImageNamed(symbol), tag = destination.ordinal.toLong()).apply {
             accessibilityLabel = destination.title
         }
     } }
@@ -51,7 +58,8 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
             bar.tintColor = accent.toUiColor()
             bar.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
             bar.unselectedItemTintColor = secondary.toUiColor()
-            bar.selectedItem = items[primarySections.indexOf(selected).coerceAtLeast(0)]
+            if (bar.items?.map { (it as UITabBarItem).tag } != items.map { it.tag }) bar.setItems(items, animated = false)
+            bar.selectedItem = destinations.indexOf(selected).takeIf { it >= 0 }?.let { items[it] }
         })
     }
 }

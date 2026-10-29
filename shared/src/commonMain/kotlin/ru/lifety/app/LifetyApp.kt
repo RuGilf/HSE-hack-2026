@@ -68,11 +68,22 @@ import ru.lifety.feature.finance.FinanceScreen
 import ru.lifety.feature.health.HealthScreen
 import ru.lifety.feature.tasks.TaskEditorScreen
 import ru.lifety.core.security.*
+import ru.lifety.app.navigation.*
+import ru.lifety.feature.people.PeopleScreen
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.HorizontalDivider
+import ru.lifety.core.ui.LifetyBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LifetyApp(repositories: Repositories? = null) {
-    SectionLockProvider { LifetyContent(repositories) }
+    SectionLockProvider { NavigationProvider(repositories?.navigation) { LifetyContent(repositories) } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +97,8 @@ private fun LifetyContent(repositories: Repositories?) {
     val density = LocalDensity.current
     val keyboardVisible by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
     var settings by rememberSaveable { mutableStateOf(false) }
+    var more by remember { mutableStateOf(false) }
+    val navigationItems = LocalNavigationItems.current
     val lockState = LocalSectionLockState.current
     var settingsEpoch by remember { mutableStateOf(lockState.epoch) }
     var planRoute by rememberSaveable { mutableStateOf(AppDestination.TASKS.route) }
@@ -111,11 +124,12 @@ private fun LifetyContent(repositories: Repositories?) {
     PlanningProvider(repositories) {
     LifetyTheme {
         CompositionLocalProvider(LocalRepositories provides repositories, LocalPlannerNavigation provides planner, LocalRootNavigator provides navigator) {
-            val section = if (route == AppDestination.CALENDAR.route) AppDestination.TASKS else AppDestination.fromRoute(route.orEmpty())
+            val section = AppDestination.fromRoute(route.orEmpty())
+            val selectedNavigation = if (section in listOf(AppDestination.CALENDAR, AppDestination.PEOPLE) && section !in navigationItems && AppDestination.TASKS in navigationItems) AppDestination.TASKS else section
             val showNavigation = !isEditor && !keyboardVisible
             val bottomInset = if (isIos && showNavigation) 49.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() else 0.dp
             val selectSection: (AppDestination) -> Unit = { item ->
-                val target = if (item == AppDestination.TASKS) AppDestination.fromRoute(planRoute) else item
+                val target = if (item == AppDestination.TASKS && AppDestination.CALENDAR !in navigationItems) AppDestination.fromRoute(planRoute) else item
                 if (section != item) navigator.navigate(target)
             }
             CompositionLocalProvider(LocalBottomNavigationInset provides bottomInset) {
@@ -129,6 +143,7 @@ private fun LifetyContent(repositories: Repositories?) {
                                     if (section == AppDestination.DASHBOARD) LifetyMascot(Modifier.padding(start = 12.dp).size(32.dp), animated = false)
                                 },
                                 actions = {
+                                    IconButton(onClick = { settingsEpoch = lockState.epoch; more = true }, modifier = Modifier.semantics { contentDescription = "Все разделы" }) { LifetyIcon(LifetySymbol.More) }
                                     IconButton(onClick = { settingsEpoch = lockState.epoch; settings = true }, modifier = Modifier.semantics { contentDescription = "Настройки" }) {
                                         LifetyIcon(LifetySymbol.Settings, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
@@ -137,7 +152,7 @@ private fun LifetyContent(repositories: Repositories?) {
                             )
                         },
                         bottomBar = {
-                            if (showNavigation && !isIos) PlatformNavigationBar(section, selectSection)
+                            if (showNavigation && !isIos) PlatformNavigationBar(selectedNavigation, selectSection)
                         },
                     ) { padding ->
                         NavHost(
@@ -154,6 +169,7 @@ private fun LifetyContent(repositories: Repositories?) {
                             composable(AppDestination.FINANCE.route) { SectionGuard("finance") { FinanceScreen(Modifier.fillMaxSize()) } }
                             composable(AppDestination.ASSISTANT.route) { SectionGuard("assistant") { AssistantScreen(Modifier.fillMaxSize()) } }
                             composable(AppDestination.HEALTH.route) { SectionGuard("health") { HealthScreen(Modifier.fillMaxSize()) } }
+                            composable(AppDestination.PEOPLE.route) { SectionGuard("people") { PeopleScreen(Modifier.fillMaxSize()) } }
                             composable<TaskEditorRoute>(
                                 enterTransition = { EnterTransition.None },
                                 exitTransition = { ExitTransition.None },
@@ -166,13 +182,23 @@ private fun LifetyContent(repositories: Repositories?) {
                         }
                     }
                     if (isIos && showNavigation) Box(Modifier.align(Alignment.BottomCenter)) {
-                        PlatformNavigationBar(section, selectSection)
+                        PlatformNavigationBar(selectedNavigation, selectSection)
                     }
                 }
                 if (settings && settingsEpoch == lockState.epoch) LifetySettingsSheet(onDismiss = { settings = false }, onFinance = {
                     settings = false
                     navigator.navigate(AppDestination.FINANCE)
                 })
+                if (more && settingsEpoch == lockState.epoch) LifetyBottomSheet(onDismissRequest = { more = false }) {
+                    LazyColumn(contentPadding = PaddingValues(16.dp)) {
+                        item { Text("Все разделы", style = MaterialTheme.typography.headlineSmall) }
+                        items(availableNavigation) { id ->
+                            val destination = AppDestination.fromRoute(id)
+                            TextButton(onClick = { more = false; navigator.navigate(destination) }, modifier = Modifier.fillMaxWidth()) { Text(destination.title) }
+                        }
+                        item { HorizontalDivider(); TextButton(onClick = { more = false; settings = true }) { Text("Настройки · нижняя панель") } }
+                    }
+                }
             }
         }
     }

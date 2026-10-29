@@ -8,6 +8,7 @@ struct LifetyIosApp: App {
         IosServices.shared.credentials = KeychainStore()
         IosServices.shared.health = AppleHealthSource()
         IosServices.shared.sectionLocks = SectionLockStorage()
+        IosServices.shared.healthMetrics = AppleMetricSource()
     }
     var body: some Scene {
         WindowGroup {

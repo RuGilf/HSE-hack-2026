@@ -24,7 +24,7 @@ class PlanTransferControllerTest {
                 val controller = PlanTransferController(app.repositories, scope, { now }, { TimeZone.currentSystemDefault() })
                 withTimeout(5000) { controller.state.first { !it.loading && it.snapshot != null } }
                 controller.prepare(true, "Два часа")
-                val draft = withTimeout(5000) { controller.state.first { !it.busy && it.workspace.draft != null } }.workspace.draft!!
+                val draft = withTimeout(5000) { controller.state.first { !it.busy && (it.workspace.draft != null || it.error != null) } }.also { assertNull(it.error) }.workspace.draft!!
                 assertNull(app.repositories.chatGptExchange!!.observe().first().lastSent)
                 var sentText: String? = null
                 controller.handoff { sentText = it }
@@ -32,10 +32,11 @@ class PlanTransferControllerTest {
                 assertEquals(draft.prompt, sentText)
                 assertNull(app.repositories.chatGptExchange!!.observe().first().lastSent) // Sharing/copying is not acknowledgement.
                 controller.markSent()
-                withTimeout(5000) { controller.state.first { !it.busy && it.workspace.lastSent?.awaitingReply == true } }
+                withTimeout(5000) { controller.state.first { !it.busy && (it.workspace.lastSent?.awaitingReply == true || it.error != null) } }.also { assertNull(it.error) }
                 val plan = ImportedPlan("lifety-plan-v2", draft.baseSnapshot, "Дело оставлено в очереди", emptyList(), listOf(DeferredTask("a", "Нет доступного времени")), draft.id)
                 controller.preview(Json.encodeToString(plan))
-                withTimeout(5000) { controller.state.first { !it.busy && it.preview != null } }
+                val previewState = withTimeout(5000) { controller.state.first { !it.busy && (it.preview != null || it.error != null) } }
+                assertNull(previewState.error)
                 assertNull(app.repositories.planning!!.observeReport().first())
                 controller.apply()
                 withTimeout(5000) { controller.state.first { !it.busy && it.applied && it.workspace.receipt != null } }
@@ -53,7 +54,7 @@ class PlanTransferControllerTest {
                 val controller = PlanTransferController(app.repositories, scope, { now })
                 withTimeout(5000) { controller.state.first { !it.loading } }
                 controller.prepare(true, "")
-                withTimeout(5000) { controller.state.first { !it.busy && it.workspace.draft != null } }
+                withTimeout(5000) { controller.state.first { !it.busy && (it.workspace.draft != null || it.error != null) } }.also { assertNull(it.error) }
                 app.repositories.tasks.upsert(Task("a", "Другой доклад", null, null, false))
                 withTimeout(5000) { controller.state.first { it.draftStale } }
                 var handedOff = false

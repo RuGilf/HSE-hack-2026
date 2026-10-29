@@ -8,6 +8,8 @@ import ru.lifety.core.model.Task
 import ru.lifety.core.model.TaskPlan
 import ru.lifety.core.model.PlanReport
 import ru.lifety.core.model.HealthSnapshot
+import ru.lifety.core.model.Expense
+import ru.lifety.core.model.Person
 import ru.lifety.core.repository.*
 import ru.lifety.core.planning.*
 import ru.lifety.database.generated.LifetyDatabase
@@ -51,7 +53,11 @@ class SqlDelightPlanningRepository(database: LifetyDatabase, private val dispatc
             val workspace = queries.readChatGptWorkspace()
             val sleep = if (plan.format == "lifety-plan-v2" && workspace.preferences.includeSleep)
                 summarizeSleep(queries.selectHealthHistory(::HealthSnapshot).executeAsList(), now, TimeZone.currentSystemDefault()) else null
-            validateChatGptResponse(plan, workspace, snapshot, sleep, now, TimeZone.currentSystemDefault())
+            val extra = selectedExtraContext(workspace.preferences, if (workspace.preferences.healthMetricIds.isNotEmpty()) queries.metricSnapshot() else ru.lifety.core.model.HealthMetricSnapshot(),
+                if (workspace.preferences.includeSteps) queries.selectHealthHistory(::HealthSnapshot).executeAsList() else emptyList(),
+                if (workspace.preferences.includeFinance) queries.selectExpenses(::Expense).executeAsList() else emptyList(),
+                if (workspace.preferences.includePeople) queries.selectPeople(::Person).executeAsList() else emptyList(), now, TimeZone.currentSystemDefault())
+            validateChatGptResponse(plan, workspace, snapshot, sleep, now, TimeZone.currentSystemDefault(), extra)
             val tasks = snapshot.tasks.associateBy { it.id }
             plan.tasks.forEach { item ->
                 val task = tasks.getValue(item.taskId)

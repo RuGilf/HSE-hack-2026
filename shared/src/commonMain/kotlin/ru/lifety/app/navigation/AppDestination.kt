@@ -7,7 +7,8 @@ enum class AppDestination(val route: String, val title: String) {
     CALENDAR("calendar", "Календарь"),
     FINANCE("finance", "Финансы"),
     ASSISTANT("assistant", "Ассистент"),
-    HEALTH("health", "Здоровье");
+    HEALTH("health", "Здоровье"),
+    PEOPLE("people", "Люди");
 
     companion object {
         fun fromRoute(route: String): AppDestination = entries.firstOrNull { it.route == route } ?: DASHBOARD

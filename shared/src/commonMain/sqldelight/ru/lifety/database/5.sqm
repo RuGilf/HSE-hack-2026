@@ -1,0 +1,23 @@
+import kotlin.Boolean;
+
+CREATE TABLE healthMetric (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    aggregation TEXT NOT NULL,
+    sourceKey TEXT UNIQUE,
+    archived INTEGER AS Boolean NOT NULL DEFAULT 0
+);
+CREATE TABLE healthEntry (
+    id TEXT NOT NULL PRIMARY KEY,
+    metricId TEXT NOT NULL REFERENCES healthMetric(id),
+    timestamp INTEGER NOT NULL,
+    value TEXT NOT NULL,
+    source TEXT NOT NULL
+);
+CREATE INDEX healthEntryMetricTime ON healthEntry(metricId, timestamp);
+CREATE TABLE navigationPreference (
+    id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+    routes TEXT NOT NULL
+);

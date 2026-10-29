@@ -10,4 +10,6 @@ data class Repositories(
     val goals: GoalRepository? = null,
     val planning: PlanningRepository? = null,
     val chatGptExchange: ChatGptExchangeRepository? = null,
+    val healthMetrics: HealthMetricsRepository? = null,
+    val navigation: NavigationPreferencesRepository? = null,
 )

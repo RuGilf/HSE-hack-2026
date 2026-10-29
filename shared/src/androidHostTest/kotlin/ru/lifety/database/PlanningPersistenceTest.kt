@@ -104,6 +104,7 @@ class PlanningPersistenceTest {
     @Test fun migrationThreeToCurrentPreservesAllExistingRecords() = runBlocking {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY); LifetyDatabase.Schema.create(driver)
         // Reconstruct the real v3 table set, then run the additive migration chain.
+        driver.execute(null, "DROP TABLE healthEntry", 0); driver.execute(null, "DROP TABLE healthMetric", 0); driver.execute(null, "DROP TABLE navigationPreference", 0)
         driver.execute(null, "DROP TABLE chatGptExchange", 0)
         driver.execute(null, "DROP TABLE goal", 0); driver.execute(null, "DROP TABLE taskPlan", 0); driver.execute(null, "DROP TABLE planReport", 0)
         driver.execute(null, "INSERT INTO task VALUES ('t','Старая задача',NULL,100,0)", 0)

@@ -12,6 +12,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import ru.lifety.feature.assistant.agent.*
 import ru.lifety.core.ui.*
+import ru.lifety.core.model.HealthMetricSnapshot
+import kotlinx.coroutines.flow.catch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun AgentSettingsSheet(state: AgentChatState, controller: AgentChatController, openTransfer: () -> Unit, dismiss: () -> Unit) {
@@ -20,6 +22,10 @@ import ru.lifety.core.ui.*
     var key by remember(state.credentials) { mutableStateOf(state.credentials.key) }
     var scopes by remember(state.view.document.scopes) { mutableStateOf(state.view.document.scopes) }
     var confirmScopes by remember { mutableStateOf(false) }
+    var metrics by remember { mutableStateOf(HealthMetricSnapshot()) }
+    var metricsError by remember { mutableStateOf(false) }
+    val metricRepository = LocalRepositories.current?.healthMetrics
+    LaunchedEffect(metricRepository) { metricRepository?.observe()?.catch { metricsError = true }?.collect { metrics = it; metricsError = false } }
     val entered = AgentCredentials(state.credentials.settings.copy(baseUrl = base.trim().trimEnd('/').removeSuffix("/chat/completions"), model = model.trim()), key.trim())
     val configured = state.connected && entered == state.credentials
     LifetyBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -49,6 +55,16 @@ import ru.lifety.core.ui.*
             ScopeToggle("Расходы", scopes.finance, state.connected && !state.busy) { scopes = scopes.copy(finance = it) }
             ScopeToggle("Задачи, цели и план", scopes.tasks, state.connected && !state.busy) { scopes = scopes.copy(tasks = it) }
             ScopeToggle("Здоровье", scopes.health, state.connected && !state.busy) { scopes = scopes.copy(health = it) }
+            if (scopes.health) {
+                Text("Какие показатели здоровья доступны ИИ", style = MaterialTheme.typography.titleSmall)
+                ScopeToggle("Сон", scopes.healthSleep, !state.busy) { scopes = scopes.copy(healthSleep = it) }
+                ScopeToggle("Шаги", scopes.healthSteps, !state.busy) { scopes = scopes.copy(healthSteps = it) }
+                if (metricsError) Text("Не удалось загрузить показатели. Сохранённый выбор не изменён.", color = MaterialTheme.colorScheme.error)
+                metrics.metrics.filterNot { it.archived }.forEach { metric -> ScopeToggle(metric.name, metric.id in scopes.healthMetricIds, !state.busy) { selected ->
+                    scopes = scopes.copy(healthMetricIds = if (selected) scopes.healthMetricIds + metric.id else scopes.healthMetricIds - metric.id)
+                } }
+                Text("Последние 7 дней и месячные медианы. Полная история не передаётся.", style = MaterialTheme.typography.bodySmall)
+            }
             ScopeToggle("Личная память", scopes.memory, state.connected && !state.busy) { scopes = scopes.copy(memory = it) }
             FilledTonalButton(onClick = { confirmScopes = true },
                 enabled = state.connected && !state.busy && scopes != state.view.document.scopes, modifier = Modifier.fillMaxWidth()) { Text("Применить доступ") }

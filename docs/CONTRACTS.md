@@ -247,7 +247,7 @@ controller подключает `IosServices.credentials` (Keychain) и `.health
 | `health` / `HEALTH` | `ru.lifety.feature.health` | `C/feature/health/HealthScreen.kt`: `HealthScreen` |
 
 Корень использует Compose Navigation: `rememberNavController()` + `NavHost`.
-Шесть прежних строковых routes сохранены. Основных пунктов NavigationBar пять:
+Шесть прежних строковых routes сохранены. По умолчанию пунктов NavigationBar пять (настраивается 1–5; см. обновление 2026-10-30):
 **Главная, План, Финансы, Здоровье, Ассистент**. `tasks` открывает `PlanScreen`
 с вкладками Задачи/Календарь; `calendar` — совместимый вход в План с выбранным
 календарём. Оба отмечают один пункт «План». Состояния вкладок сохраняются.
@@ -684,3 +684,57 @@ interface PersonRepository {
   под native tab bar, inset находится в content padding. API composer — overlay.
   Детальные ограничения/проверки: [SECTION_LOCKS.md](SECTION_LOCKS.md),
   [TIME_PLANNING.md](TIME_PLANNING.md).
+
+
+## 2026-10-30: произвольные показатели, категории ИИ и нижняя панель
+
+- `core/model/HealthMetric.kt`, пакет `ru.lifety.core.model`: `HealthMetric`,
+  `HealthEntry`, `HealthMetricSnapshot`, `MetricKind` (NUMBER/TEXT/BOOLEAN),
+  `MetricAggregation` (LATEST/SUM/AVERAGE), каталог `healthApiMetrics`.
+  Прежние модели Task/Expense/HealthSnapshot/Person не менялись.
+- `core/repository/HealthMetricsRepository.kt`, `ru.lifety.core.repository`:
+  `observe(): Flow<HealthMetricSnapshot>`, suspend `snapshot()`, `saveMetric(metric)`,
+  `saveEntry(entry)`, `deleteEntry(id)`, `importSamples(samples, source)`.
+  Определения архивируются, записи сохраняются. Тип нельзя менять после первой записи.
+  Ручные числа нормализуются, NaN/Infinity отклоняются; API-строки нельзя
+  перезаписать через ручной saveEntry. Импорт read-only, только после предпросмотра.
+- `Repositories.healthMetrics` и `.navigation` добавлены nullable с defaults;
+  `AppContainer` поставляет реализации SQLDelight. Один dispatcher с parallelism=1
+  сериализует операции общей БД и предотвращает пересечение read/write transactions.
+- Schema **6**, миграция `5.sqm`: healthMetric, healthEntry (индекс metricId/timestamp),
+  navigationPreference. Существующие таблицы и данные сохраняются.
+- `feature/health/HealthMetricsSection.kt`: редактор определения, архив, история,
+  ручное добавление/редактирование/удаление, график до 90 известных дней.
+  `DeviceMetricsSheet.kt` + platform `MetricDeviceSource`: выбранные вес, пульс
+  в покое, вода, активная энергия; 30 дней, разрешение → чтение → сохранение.
+  iOS `IosServices.healthMetrics: IosMetricSource?`, host `AppleMetricSource`
+  в AppleHealthSource.swift; Android Health Connect. Missing ≠ zero.
+- Импорт ID = source:key:dayTimestamp; повторный импорт заменяет итог.
+  Для дня ручные записи имеют приоритет; SUM/AVERAGE считают ручные записи,
+  при их отсутствии берут один итог API. Разные провайдеры не суммируются.
+- `core/planning/HealthMetricContext.kt`: summarizeMetric/selectedExtraContext.
+  Семь календарных дней (null для пропусков), месячные медианы чисел по известным
+  дневным итогам; текст/да-нет только семь дней. Финансы: агрегаты 30 дней по
+  валюте/категории, точная строка amountMinor. Люди: явное включение карточек целиком.
+- `ChatGptPreferences` дополнены includeTasks/includeGoals (default true),
+  includeSteps/includeFinance/includePeople (false), healthMetricIds (empty).
+  Ручной редактор запроса хранит выбор. Выключенная категория отсутствует в
+  новом JSON; выбор входит в fingerprint, выбранные данные повторно проверяются
+  при handoff и атомарном apply. Без задач разрешён обычный вопрос, импорт плана
+  отключён. Изменение настроек удаляет draft и закрывает ожидание прежнего ответа.
+- API `AgentScopes` дополнен healthSleep/healthSteps (true для совместимости),
+  healthMetricIds (empty); общий health по-прежнему false до явного включения.
+  API workspace содержит summary.json и выбранные sleep/steps только за 7 дней,
+  сырая более ранняя история не экспортируется. Смена scopes очищает workspace/чат.
+  Предыдущие отправки внешнему сервису отозвать нельзя.
+- `NavigationPreferencesRepository`: observe(): Flow<List<String>>, suspend save(routes).
+  Допустимы 1–5 уникальных routes; порядок сохраняется локально в SQLite.
+  `app/navigation/NavigationPreferences.kt`: defaultNavigation/availableNavigation,
+  NavigationProvider, LocalNavigationItems. В native iOS используются стабильные
+  enum tags, прозрачный overlay сохранён. Android использует те же routes/порядок.
+- Прежние routes неизменны; новый **people** → `PeopleScreen(modifier)`.
+  Редактор: Настройки → Нижняя панель. Добавляются calendar/people; скрытые разделы
+  доступны через «Все разделы» сверху. Calendar и People наследуют защиту «План».
+  При отдельном Calendar в панели «План» открывает Tasks; без него помнит вкладку.
+
+Подробности и проверка: [CUSTOM_HEALTH_AND_NAVIGATION.md](CUSTOM_HEALTH_AND_NAVIGATION.md).

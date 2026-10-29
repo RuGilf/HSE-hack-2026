@@ -36,10 +36,11 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
     val controller = LocalAppearance.current ?: return
     val state by controller.state.collectAsState()
     var security by remember { mutableStateOf(false) }
+    var navigation by remember { mutableStateOf(false) }
     val lockState = LocalSectionLockState.current
     LaunchedEffect(controller) { controller.refreshIcon() }
     LifetyBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, contentColor = MaterialTheme.colorScheme.onSurface) {
-        if (security) SectionLockSettingsContent(onBack = { security = false }) else {
+        if (security) SectionLockSettingsContent(onBack = { security = false }) else if (navigation) NavigationSettingsContent(onBack = { navigation = false }) else {
         Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.CenterHorizontally)
             .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -55,6 +56,12 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
                     Text("Код-пароль на разделы", style = MaterialTheme.typography.titleMedium)
                     Text(if (lockState.configuration.enabled) "Защищено разделов: ${lockState.configuration.sections.size}" else "Выберите, какие разделы защищать",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            OutlinedCard(onClick = { navigation = true }, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Нижняя панель", style = MaterialTheme.typography.titleMedium)
+                    Text("Пункты и порядок в овале", style = MaterialTheme.typography.bodySmall)
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

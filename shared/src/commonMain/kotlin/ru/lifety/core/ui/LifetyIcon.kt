@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
 
-enum class LifetySymbol { Home, Plan, Wallet, Heart, Assistant, Settings, Calendar, Plus, Close, Back, More, Chevron, Check, Sleep, Steps }
+enum class LifetySymbol { Home, Plan, Wallet, Heart, Assistant, Settings, Calendar, Plus, Close, Back, More, Chevron, Check, Sleep, Steps, People }
 
 @Composable
 fun LifetyIcon(symbol: LifetySymbol, modifier: Modifier = Modifier, color: Color = LocalContentColor.current) {
@@ -27,6 +27,12 @@ fun LifetyIcon(symbol: LifetySymbol, modifier: Modifier = Modifier, color: Color
         withTransform({ scale(size.width / 24f, size.height / 24f, Offset.Zero) }) {
             val path = Path()
             when (symbol) {
+                LifetySymbol.People -> {
+                    drawCircle(color, 3.5f, Offset(9f, 7f), style = pen)
+                    path.moveTo(2f, 21f); path.cubicTo(2f, 11f, 16f, 11f, 16f, 21f)
+                    path.moveTo(16f, 4f); path.cubicTo(22f, 4f, 22f, 11f, 17f, 11f)
+                    path.moveTo(18f, 15f); path.cubicTo(22f, 15f, 22f, 19f, 22f, 21f)
+                }
                 LifetySymbol.Home -> {
                     path.moveTo(3f, 10f); path.lineTo(12f, 3f); path.lineTo(21f, 10f); path.lineTo(21f, 21f)
                     path.lineTo(15f, 21f); path.lineTo(15f, 14f); path.lineTo(9f, 14f); path.lineTo(9f, 21f); path.lineTo(3f, 21f); path.close()

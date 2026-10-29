@@ -22,7 +22,7 @@ internal data class SectionLockState(val ready: Boolean = false, val busy: Boole
     val configuration: LockConfiguration = LockConfiguration(), val unlocked: Boolean = false,
     val epoch: Long = 0, val error: String? = null) {
     fun protects(route: String): Boolean {
-        val canonical = if (route == "calendar") "tasks" else route
+        val canonical = if (route in setOf("calendar", "people")) "tasks" else route
         return canonical in configuration.sections ||
             (canonical in setOf("dashboard", "assistant") && configuration.sections.any { it in setOf("tasks", "finance", "health") })
     }

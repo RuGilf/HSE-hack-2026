@@ -34,7 +34,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Lifety читает выбранные вами сон и шаги, чтобы показать историю и графики. Чтение запускается по кнопке; перед сохранением вы проверяете каждый день. Доступ ИИ включается отдельно.</string>
+	<string>Lifety читает выбранные вами сон, шаги, вес, пульс в покое, воду и активную энергию, чтобы показать историю и графики. Чтение запускается по кнопке; перед сохранением вы проверяете каждый день. Доступ ИИ включается отдельно.</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

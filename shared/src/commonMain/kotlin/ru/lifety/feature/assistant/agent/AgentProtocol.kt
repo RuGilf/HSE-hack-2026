@@ -10,7 +10,8 @@ val agentJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     val calls: List<ToolCall> = emptyList(), val callId: String? = null, val turn: Int = 0, val artifact: String? = null,
     val reasoningDetails: JsonArray? = null, val reasoning: String? = null)
 @Serializable data class AgentScopes(val finance: Boolean = false, val tasks: Boolean = false,
-    val health: Boolean = false, val memory: Boolean = false) {
+    val health: Boolean = false, val memory: Boolean = false,
+    val healthSleep: Boolean = true, val healthSteps: Boolean = true, val healthMetricIds: Set<String> = emptySet()) {
     fun allows(source: String) = when (source) {
         "expenses" -> finance; "tasks" -> tasks; "health" -> health; "memory" -> memory; else -> false
     }

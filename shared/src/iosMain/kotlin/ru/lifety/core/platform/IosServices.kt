@@ -1,6 +1,7 @@
 package ru.lifety.core.platform
 
 import ru.lifety.core.model.HealthSnapshot
+import ru.lifety.core.model.HealthApiSample
 
 /** Implemented by the iOS host; credentials never enter the agent's file workspace. */
 interface IosCredentialStorage {
@@ -22,8 +23,16 @@ interface IosHealthSource {
     fun cancelRead()
 }
 
+interface IosMetricSource {
+    val available: Boolean
+    fun requestAccess(keys: List<String>, completion: (String?) -> Unit)
+    fun readDays(keys: List<String>, completion: (List<HealthApiSample>?, String?) -> Unit)
+    fun cancel()
+}
+
 object IosServices {
     var credentials: IosCredentialStorage? = null
     var health: IosHealthSource? = null
     var sectionLocks: IosSectionLockStorage? = null
+    var healthMetrics: IosMetricSource? = null
 }

@@ -16,6 +16,7 @@ class SqlDelightChatGptExchangeRepository(database: LifetyDatabase, private val 
     override fun observe(): Flow<ChatGptWorkspace> = queries.selectChatGptExchange().asFlow().mapToOneOrNull(dispatcher)
         .map { it?.let { Json.decodeFromString<ChatGptWorkspace>(it) } ?: ChatGptWorkspace() }
     override suspend fun savePreferences(preferences: ChatGptPreferences) = withContext(dispatcher) {
+        require(preferences.healthMetricIds.size <= 50)
         require(preferences.instructions.length <= 4000 && preferences.conversationUrl.length <= 2048 && validConversationUrl(preferences.conversationUrl)) { "Укажите личную ссылку https://chatgpt.com/c/… или оставьте поле пустым" }
         queries.transaction {
             val old = queries.readChatGptWorkspace()

@@ -27,7 +27,7 @@ class SectionLockControllerTest {
         assertTrue(c.state.value.unlocked)
         assertFalse(platform.value!!.contains("135790"))
         val restored = loaded(platform, this)
-        listOf("finance", "tasks", "calendar", "dashboard", "assistant").forEach { assertTrue(restored.state.value.needsUnlock(it), it) }
+        listOf("finance", "tasks", "calendar", "people", "dashboard", "assistant").forEach { assertTrue(restored.state.value.needsUnlock(it), it) }
         assertFalse(restored.state.value.needsUnlock("health"))
         restored.unlock("135790")!!.join()
         assertFalse(restored.state.value.needsUnlock("finance"))

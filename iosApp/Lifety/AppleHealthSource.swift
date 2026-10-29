@@ -124,3 +124,101 @@ private final class HealthReadState {
         DispatchQueue.main.async { callback(failure == nil ? rows : nil, failure) }
     }
 }
+
+/// Additional read-only categories. Each response is an alternative daily value, never a missing zero.
+final class AppleMetricSource: IosMetricSource {
+    private let store = HKHealthStore()
+    private var queries: [HKQuery] = []
+    private var generation = UUID()
+    private let gate = NSLock()
+    private var pending: MetricReadState?
+    var available: Bool { HKHealthStore.isHealthDataAvailable() }
+    private func specification(_ key: String) -> (HKQuantityType, HKUnit, HKStatisticsOptions)? {
+        let identifier: HKQuantityTypeIdentifier
+        let unit: HKUnit
+        let option: HKStatisticsOptions
+        switch key {
+        case "weight": identifier = .bodyMass; unit = .gramUnit(with: .kilo); option = .mostRecent
+        case "resting-heart-rate": identifier = .restingHeartRate; unit = .count().unitDivided(by: .minute()); option = .mostRecent
+        case "water": identifier = .dietaryWater; unit = .literUnit(with: .milli); option = .cumulativeSum
+        case "active-energy": identifier = .activeEnergyBurned; unit = .kilocalorie(); option = .cumulativeSum
+        default: return nil
+        }
+        guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else { return nil }
+        return (type, unit, option)
+    }
+    func requestAccess(keys: [String], completion: @escaping (String?) -> Void) {
+        let types = Set(keys.compactMap { specification($0)?.0 })
+        guard available, !types.isEmpty, types.count == keys.count else { completion("Тип данных недоступен"); return }
+        store.requestAuthorization(toShare: [], read: types) { success, error in
+            DispatchQueue.main.async { completion(success ? nil : error?.localizedDescription ?? "Ошибка доступа") }
+        }
+    }
+    func cancel() {
+        gate.lock(); let previous = queries; queries = []; generation = UUID()
+        pending?.cancel(); pending = nil; gate.unlock()
+        previous.forEach(store.stop)
+    }
+    func readDays(keys: [String], completion: @escaping ([HealthApiSample]?, String?) -> Void) {
+        cancel()
+        guard available, !keys.isEmpty, Set(keys).count == keys.count, keys.allSatisfy({ specification($0) != nil }) else { completion(nil, "Тип данных недоступен"); return }
+        let calendar = Calendar.current
+        let end = Date(), today = calendar.startOfDay(for: Date())
+        guard let start = calendar.date(byAdding: .day, value: -29, to: today) else { completion(nil, "Ошибка даты"); return }
+        gate.lock(); let token = generation; gate.unlock()
+        let state = MetricReadState(count: keys.count) { [weak self] rows, error in
+            guard let self else { return }
+            self.gate.lock(); let current = self.generation == token
+            let finished = current ? self.queries : []
+            if current { self.queries = []; self.pending = nil }; self.gate.unlock()
+            guard current else { return }
+            finished.forEach(self.store.stop)
+            completion(rows, error)
+        }
+        gate.lock(); pending = state; gate.unlock()
+        for key in keys {
+            let (type, unit, option) = specification(key)!
+            let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+            let query = HKStatisticsCollectionQuery(quantityType: type, quantitySamplePredicate: predicate,
+                options: option, anchorDate: start, intervalComponents: DateComponents(day: 1))
+            query.initialResultsHandler = { [weak state] _, collection, error in
+                guard let state else { return }
+                var values: [HealthApiSample] = []
+                collection?.enumerateStatistics(from: start, to: end) { statistics, _ in
+                    let quantity = option == .cumulativeSum ? statistics.sumQuantity() : statistics.mostRecentQuantity()
+                    if let value = quantity?.doubleValue(for: unit), value.isFinite, value >= 0, value <= 1e9 {
+                        let day = calendar.startOfDay(for: statistics.startDate)
+                        values.append(HealthApiSample(key: key, timestamp: Int64(day.timeIntervalSince1970 * 1000), value: value))
+                    }
+                }
+                state.finish(values: values, error: error)
+            }
+            gate.lock(); let current = generation == token
+            if current { queries.append(query) }; gate.unlock()
+            if current { store.execute(query) }
+        }
+    }
+}
+
+private final class MetricReadState {
+    private let lock = NSLock()
+    private var remaining: Int
+    private var output: [HealthApiSample] = []
+    private var failed = false
+    private var completion: (([HealthApiSample]?, String?) -> Void)?
+    init(count: Int, completion: @escaping ([HealthApiSample]?, String?) -> Void) {
+        remaining = count; self.completion = completion
+    }
+    func cancel() { lock.lock(); completion = nil; output = []; lock.unlock() }
+    func finish(values: [HealthApiSample], error: Error?) {
+        lock.lock()
+        guard completion != nil else { lock.unlock(); return }
+        output.append(contentsOf: values); failed = failed || error != nil; remaining -= 1
+        guard remaining == 0, let callback = completion else { lock.unlock(); return }
+        completion = nil
+        let rows = output.sorted { $0.timestamp == $1.timestamp ? $0.key < $1.key : $0.timestamp < $1.timestamp }
+        let failure = failed ? "Ошибка чтения Apple Health" : nil
+        output = []; lock.unlock()
+        DispatchQueue.main.async { callback(failure == nil ? rows : nil, failure) }
+    }
+}

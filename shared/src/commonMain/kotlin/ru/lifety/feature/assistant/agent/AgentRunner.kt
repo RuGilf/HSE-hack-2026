@@ -251,7 +251,8 @@ class AgentRunner(
 
     companion object {
         fun factAllowed(fact: UserFact, scopes: AgentScopes) = when (fact.domain) {
-            "health" -> scopes.health; "finance" -> scopes.finance; "tasks" -> scopes.tasks; "general" -> true; else -> false
+            "health" -> scopes.health && scopes.healthSleep && scopes.healthSteps && scopes.healthMetricIds.isEmpty()
+            "finance" -> scopes.finance; "tasks" -> scopes.tasks; "general" -> true; else -> false
         }
         const val SYSTEM = """Ты персональный помощник Lifety. Помогай человеку принять решение или выполнить его задачу. Отвечай на языке пользователя, спокойно и по делу.
 

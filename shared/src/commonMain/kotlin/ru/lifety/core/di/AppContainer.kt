@@ -14,11 +14,14 @@ import ru.lifety.database.SqlDelightGoalRepository
 import ru.lifety.database.SqlDelightPlanningRepository
 import ru.lifety.database.SqlDelightChatGptExchangeRepository
 import ru.lifety.database.createDatabase
+import ru.lifety.database.SqlDelightHealthMetricsRepository
+import ru.lifety.database.SqlDelightNavigationPreferencesRepository
 
 /** One owner for the database connection and all repositories. Construct off the UI thread. */
 class AppContainer(
     private val driver: SqlDriver,
-    dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    // All adapters share one connection. Keep transactions and reactive reads serialized.
+    dispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1),
 ) : AutoCloseable {
     private val database = createDatabase(driver)
     val repositories = Repositories(
@@ -30,6 +33,8 @@ class AppContainer(
         goals = SqlDelightGoalRepository(database, dispatcher),
         planning = SqlDelightPlanningRepository(database, dispatcher),
         chatGptExchange = SqlDelightChatGptExchangeRepository(database, dispatcher),
+        healthMetrics = SqlDelightHealthMetricsRepository(database, dispatcher),
+        navigation = SqlDelightNavigationPreferencesRepository(database, dispatcher),
     )
 
     override fun close() { driver.close() }

@@ -86,15 +86,16 @@ internal fun PlanTransferContent(modifier: Modifier = Modifier, onBusyChanged: (
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     val formOpen = prepareExpanded || (draft == null && sent == null) || state.snapshot?.tasks?.none { !it.isCompleted } == true
+                    TextButton(onClick = { settings = true }, enabled = !state.busy) { Text("Что отправить в ИИ · редактор запроса") }
                     Text(if (!formOpen) "Ваш контекст" else if (sent == null) "Начнём ваш разговор" else "Обновим ваш разговор", style = MaterialTheme.typography.titleLarge)
                     if (formOpen) Text("Вставляйте запросы в один и тот же чат ChatGPT. Первый задаёт правила, следующие обновляют состояние.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    state.snapshot?.let { Text("Задач: ${it.tasks.count { t -> !t.isCompleted }} · Целей: ${it.goals.count { g -> !g.isCompleted }}", style = MaterialTheme.typography.labelLarge) }
-                    changes?.takeIf { formOpen || it.added + it.changed + it.completedOrRemoved + it.goalsChanged > 0 }?.let { Text("С последней отправки: +${it.added} новых, ${it.changed} изменено, ${it.completedOrRemoved} выполнено / удалено. Изменений целей: ${it.goalsChanged}.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    state.snapshot?.let { Text("Задачи: ${if (workspace.preferences.includeTasks) it.tasks.count { t -> !t.isCompleted }.toString() else "не включены"} · Цели: ${if (workspace.preferences.includeGoals) it.goals.count { g -> !g.isCompleted }.toString() else "не включены"}", style = MaterialTheme.typography.labelLarge) }
+                    changes?.takeIf { workspace.preferences.includeTasks && workspace.preferences.includeGoals && (formOpen || it.added + it.changed + it.completedOrRemoved + it.goalsChanged > 0) }?.let { Text("С последней отправки: +${it.added} новых, ${it.changed} изменено, ${it.completedOrRemoved} выполнено / удалено. Изменений целей: ${it.goalsChanged}.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     if (workspace.preferences.includeSleep) Text("Сон: 7 дней · месяцев в сводке: ${state.sleep?.months?.size ?: 0}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     else Text("Сон не включён · можно добавить в настройках обмена", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (formOpen) {
-                        OutlinedTextField(request, { request = it.take(2000) }, Modifier.fillMaxWidth(), label = { Text("Пожелания к этому плану") }, placeholder = { Text("Например: свободен после 18:00, оставь время на отдых") }, minLines = 2, maxLines = 4, enabled = !state.busy)
-                        if (state.snapshot?.tasks?.none { !it.isCompleted } == true) {
+                        OutlinedTextField(request, { request = it.take(2000) }, Modifier.fillMaxWidth(), label = { Text(if (workspace.preferences.includeTasks) "Пожелания к этому плану" else "Вопрос для ChatGPT") }, placeholder = { Text("Например: свободен после 18:00, оставь время на отдых") }, minLines = 2, maxLines = 4, enabled = !state.busy)
+                        if (workspace.preferences.includeTasks && state.snapshot?.tasks?.none { !it.isCompleted } == true) {
                             val planner = LocalPlannerNavigation.current
                             FilledTonalButton(onClick = { planner?.createTask() }, enabled = planner != null) { Text("Добавить задачу") }
                         } else Button(onClick = { localError = null; notice = null; controller.prepare(initial = sent == null, request) }, enabled = !state.busy && !state.loading && state.snapshot != null, modifier = Modifier.fillMaxWidth()) {
@@ -147,7 +148,9 @@ internal fun PlanTransferContent(modifier: Modifier = Modifier, onBusyChanged: (
         item(key = "import") {
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Вернуть план в Lifety", style = MaterialTheme.typography.titleMedium)
+                    Text(if (workspace.preferences.includeTasks) "Вернуть план в Lifety" else "Ответ — в вашем разговоре ChatGPT", style = MaterialTheme.typography.titleMedium)
+                    if (!workspace.preferences.includeTasks) Text("Обсуждайте ответ прямо в ChatGPT. Чтобы перенести расписание в Lifety, включите задачи в редакторе и подготовьте новый запрос.", style = MaterialTheme.typography.bodySmall)
+                    else {
                     Text("Скопируйте итоговый ответ из ChatGPT. Сначала покажем изменения — расписание обновится только после подтверждения.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Button(colors = if (sent?.awaitingReply == true) ButtonDefaults.buttonColors() else ButtonDefaults.filledTonalButtonColors(), onClick = { val value = clipboard.getText()?.text; if (value.isNullOrBlank()) localError = "Буфер обмена пуст. Скопируйте итоговый ответ ChatGPT." else readAnswer(value) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Вставить ответ ChatGPT") }
                     Row {
@@ -157,6 +160,7 @@ internal fun PlanTransferContent(modifier: Modifier = Modifier, onBusyChanged: (
                     if (inputVisible) {
                         OutlinedTextField(text, { if (it.length <= 1_000_000) { text = it; localError = null; controller.discardPreview() } else localError = "Ответ слишком большой" }, Modifier.fillMaxWidth(), label = { Text("Итоговый ответ с планом") }, minLines = 3, maxLines = 7, enabled = !state.busy)
                         TextButton(onClick = { controller.preview(text) }, enabled = !state.busy && text.isNotBlank()) { Text("Проверить ответ") }
+                    }
                     }
                     (localError ?: state.error)?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                     if (state.snapshot == null && !state.loading) TextButton(onClick = controller::load) { Text("Повторить загрузку") }

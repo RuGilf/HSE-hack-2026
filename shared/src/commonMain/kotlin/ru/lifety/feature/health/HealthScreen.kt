@@ -80,6 +80,7 @@ fun HealthScreen(modifier: Modifier = Modifier) {
                         controller.clearSaveStatus(); manualDate = (day?.date ?: today).toString(); showManual = true
                     }, enabled = repository != null && formEnabled, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Добавить запись") }
                 }
+                item { HealthMetricsSection() }
                 item { Text("История сна и движения", style = MaterialTheme.typography.titleMedium) }
                 item { HealthChart("Сон", timeline, selected, true) { selectedDate = timeline.days[it].date.toString() } }
                 item { HealthChart("Шаги", timeline, selected, false) { selectedDate = timeline.days[it].date.toString() } }

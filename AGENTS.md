@@ -31,4 +31,6 @@ composition root or edit another agent's feature implementation.
 
 For all UI changes read `docs/DESIGN_SYSTEM.md`. Use the root LifetyTheme,
 shared spacing/shapes and `LifetyMascot`; do not copy palettes or invent mock data
-from the reference. Primary navigation has five sections; calendar lives in Plan.
+from the reference. Primary navigation has 1–5 configurable sections, defaulting to the original five.
+Calendar and People can be pinned separately; all seven routes remain available
+through the top bar. Preserve the native transparent iOS tab bar.
