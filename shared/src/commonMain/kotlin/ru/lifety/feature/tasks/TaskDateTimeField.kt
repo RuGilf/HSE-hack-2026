@@ -1,6 +1,10 @@
 package ru.lifety.feature.tasks
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
+import ru.lifety.core.ui.LifetyIcon
+import ru.lifety.core.ui.LifetySymbol
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
@@ -22,6 +26,7 @@ import kotlin.time.Instant
 @Composable
 internal fun TaskDateTimeField(label: String, description: String, value: Long?, enabled: Boolean,
     referenceDate: LocalDate, deadline: Boolean, onChange: (Long?) -> Unit) {
+    var expanded by rememberSaveable(label) { mutableStateOf(false) }
     var showDate by remember { mutableStateOf(false) }
     var showTime by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -36,11 +41,16 @@ internal fun TaskDateTimeField(label: String, description: String, value: Long?,
     }
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                if (value != null) TextButton(onClick = { onChange(null); error = null }, enabled = enabled,
-                    modifier = Modifier.semantics { contentDescription = "Убрать: $label" }) { Text("Убрать") }
+            Row(Modifier.fillMaxWidth().clickable(enabled = enabled) { expanded = !expanded }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(label, style = MaterialTheme.typography.titleSmall)
+                    Text(value?.let { "${formatDate(requireNotNull(date))} · ${formatPlannerTime(it, zone)}" } ?: if (deadline) "Не задан" else "Не запланировано",
+                        style = MaterialTheme.typography.bodyMedium, color = if (value != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = { expanded = !expanded }, enabled = enabled, modifier = Modifier.semantics { contentDescription = "$label: ${if (expanded) "свернуть" else "изменить"}" }) { Text(if (expanded) "Готово" else "Изменить") }
             }
+            if (expanded) {
+            if (value != null) TextButton(onClick = { onChange(null); error = null }, enabled = enabled) { Text(if (deadline) "Убрать дедлайн" else "Убрать из расписания") }
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = date == today(zone), enabled = enabled,
@@ -62,6 +72,7 @@ internal fun TaskDateTimeField(label: String, description: String, value: Long?,
                 }
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            }
         }
     }
     if (showDate) {

@@ -1,6 +1,8 @@
 package ru.lifety.feature.assistant.transfer
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,48 +39,61 @@ internal fun ConversationSettingsSheet(preferences: ChatGptPreferences, busy: Bo
     var metricsError by remember { mutableStateOf(false) }
     val repository = LocalRepositories.current?.healthMetrics
     LaunchedEffect(repository) { repository?.observe()?.catch { metricsError = true }?.collect { metrics = it; metricsError = false } }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     LifetyBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), contentColor = MaterialTheme.colorScheme.onSurface) {
-        Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Ваш разговор ChatGPT", style = MaterialTheme.typography.titleLarge)
-            Text("Создайте один разговор или проект в ChatGPT и возвращайтесь в него с обновлениями Lifety.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(instructions, { instructions = it.take(4000) }, Modifier.fillMaxWidth(), label = { Text("Постоянные предпочтения") },
-                placeholder = { Text("Рабочие часы, доступное время, перерывы и ограничения") }, minLines = 3, maxLines = 6, enabled = !busy)
-            Text("В первый запрос войдут все предпочтения. В обновлениях они повторяются только после изменений.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(url, { url = it.take(2048); urlError = false }, Modifier.fillMaxWidth(), label = { Text("Ссылка на ваш разговор · необязательно") },
-                placeholder = { Text("https://chatgpt.com/c/…") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), singleLine = true, enabled = !busy,
-                isError = urlError, supportingText = { Text(if (urlError) "Нужна личная ссылка chatgpt.com/c/…, не публичная ссылка «Поделиться»." else "Откроем ссылку; запрос вы вставляете и отправляете сами.") })
-            HorizontalDivider()
-            Text("Что отправить в ИИ", style = MaterialTheme.typography.titleLarge)
-            ContextToggle("Задачи и дедлайны", tasks, !busy) { tasks = it }
-            ContextToggle("Глобальные цели", goals, !busy) { goals = it }
-            ContextToggle("Финансы · итоги за 30 дней", finance, !busy) { finance = it }
-            ContextToggle("Люди · дни рождения и заметки", people, !busy) { people = it }
-            ContextToggle("Шаги · компактная сводка", steps, !busy) { steps = it }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Добавлять сводку сна", style = MaterialTheme.typography.titleMedium)
-                    Text("Последние 7 дней и месячные медианы с количеством записей. Сырые записи за прошлые месяцы не отправляются.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.92f).imePadding().padding(horizontal = 20.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Контекст для ChatGPT", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                TextButton(onClick = onDismiss, enabled = !busy) { Text("Отмена") }
+            }
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                listOf("Данные", "Разговор").forEachIndexed { i, label -> SegmentedButton(tab == i, { tab = i }, SegmentedButtonDefaults.itemShape(i, 2)) { Text(label) } }
+            }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (tab == 0) {
+                    Text("Выберите, что включить в следующий запрос.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Планирование", style = MaterialTheme.typography.titleSmall)
+                    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                        Column { ContextToggle("Задачи и дедлайны", tasks, !busy) { tasks = it }; ContextToggle("Глобальные цели", goals, !busy) { goals = it } }
+                    }
+                    Text("Здоровье", style = MaterialTheme.typography.titleSmall)
+                    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                        Column {
+                            ContextToggle("Сон", sleep, !busy) { sleep = it }
+                            ContextToggle("Шаги", steps, !busy) { steps = it }
+                            metrics.metrics.filterNot { it.archived }.forEach { metric -> ContextToggle(metric.name, metric.id in metricIds, !busy) { selected -> metricIds = if (selected) metricIds + metric.id else metricIds - metric.id } }
+                        }
+                    }
+                    if (metricsError) Text("Не удалось загрузить показатели. Сохранённый выбор остаётся прежним.", color = MaterialTheme.colorScheme.error)
+                    Text("7 дней и месячные медианы чисел. Заметки и да/нет — только 7 дней.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Другие разделы", style = MaterialTheme.typography.titleSmall)
+                    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                        Column { ContextToggle("Финансы · итоги за 30 дней", finance, !busy) { finance = it }; ContextToggle("Люди · дни рождения и заметки", people, !busy) { people = it } }
+                    }
+                    if (!tasks) Text("Без задач — обычное обсуждение. Импорт расписания будет выключен.", style = MaterialTheme.typography.bodySmall)
+                    Text("Выключенные категории не войдут в новый запрос. Ранее отправленные сведения останутся в вашем разговоре ChatGPT.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    OutlinedTextField(instructions, { instructions = it.take(4000) }, Modifier.fillMaxWidth(), label = { Text("Постоянные предпочтения") },
+                        placeholder = { Text("Рабочие часы, доступное время, перерывы") }, minLines = 3, maxLines = 6, enabled = !busy)
+                    OutlinedTextField(url, { url = it.take(2048); urlError = false }, Modifier.fillMaxWidth(), label = { Text("Ссылка на разговор · необязательно") },
+                        placeholder = { Text("https://chatgpt.com/c/…") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), singleLine = true, enabled = !busy,
+                        isError = urlError, supportingText = { Text(if (urlError) "Нужна личная ссылка chatgpt.com/c/…, не публичная ссылка." else "Запрос можно скопировать и вставить в один постоянный чат.") })
+                    Text("Предпочтения повторяются в запросе после изменений. Сохранённая ссылка открывается по вашему нажатию; отправляете сообщение вы сами.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    HorizontalDivider()
+                    TextButton(onClick = onOpenApi, enabled = !busy) { Text("Подключить встроенный чат") }
+                    Text("Для обмена с ChatGPT ключ не нужен.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(sleep, { sleep = it }, enabled = !busy)
+                Spacer(Modifier.height(12.dp))
             }
-            if (metricsError) Text("Не удалось загрузить список показателей. Сохранённый выбор останется прежним.", color = MaterialTheme.colorScheme.error)
-            metrics.metrics.filterNot { it.archived }.forEach { metric ->
-                ContextToggle(metric.name, metric.id in metricIds, !busy) { selected -> metricIds = if (selected) metricIds + metric.id else metricIds - metric.id }
-            }
-            Text("Показатели: последние 7 дней и медианы по месяцам для чисел. Заметки и да/нет — только 7 дней. Без задач запрос подходит для обсуждения, импорт расписания отключён.", style = MaterialTheme.typography.bodySmall)
-            Text("Снятая галочка исключает категорию из нового запроса. Ранее отправленные данные останутся в вашем разговоре ChatGPT.", style = MaterialTheme.typography.bodySmall)
-            Text("Подготовленный текст хранится локально до импорта или изменения настроек. Внешняя отправка происходит только по вашему действию.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = { if (validConversationUrl(url.trim())) onSave(ChatGptPreferences(instructions, sleep, url.trim(), tasks, goals, steps, metricIds, finance, people)) else urlError = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Сохраняем…" else "Сохранить настройки") }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("Отмена") }
-            HorizontalDivider()
-            Text("Дополнительно", style = MaterialTheme.typography.titleSmall)
-            TextButton(onClick = onOpenApi, enabled = !busy) { Text("Встроенный чат · подключение API") }
-            Spacer(Modifier.height(24.dp))
+            Button(onClick = { if (validConversationUrl(url.trim())) onSave(ChatGptPreferences(instructions, sleep, url.trim(), tasks, goals, steps, metricIds, finance, people)) else { urlError = true; tab = 1 } }, enabled = !busy, modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) { Text(if (busy) "Сохраняем…" else "Сохранить") }
         }
     }
 }
 
 @Composable private fun ContextToggle(title: String, selected: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(title, Modifier.weight(1f)); Checkbox(selected, onChange, enabled = enabled, modifier = Modifier.semantics { contentDescription = title }) }
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(selected, enabled = enabled, role = Role.Checkbox, onValueChange = onChange).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Checkbox(selected, onCheckedChange = null, enabled = enabled)
+    }
 }

@@ -7,6 +7,7 @@ import kotlinx.serialization.json.Json
 import ru.lifety.core.model.*
 import ru.lifety.core.model.HealthMetric
 import ru.lifety.core.model.HealthEntry
+import ru.lifety.core.model.HealthSnapshot
 import ru.lifety.core.repository.*
 import ru.lifety.database.generated.LifetyDatabase
 import ru.lifety.app.navigation.*
@@ -45,17 +46,36 @@ class SqlDelightHealthMetricsRepository(database: LifetyDatabase, private val di
     }
     override suspend fun deleteEntry(id: String) = withContext(dispatcher) { q.deleteHealthEntry(id); Unit }
     override suspend fun importSamples(samples: List<HealthApiSample>, source: String) = withContext(dispatcher) {
-        require(source in setOf("healthkit", "health-connect") && samples.size <= 120)
-        require(samples.distinctBy { it.key to it.timestamp }.size == samples.size)
+        validateSamples(samples, source, 120)
+        q.transaction { writeExtraSamples(samples, source) }
+    }
+    override suspend fun importDeviceSamples(samples: List<HealthApiSample>, source: String, baseline: List<HealthSnapshot>) = withContext(dispatcher) {
+        validateSamples(samples, source, 180)
         q.transaction {
-            val old = q.metricSnapshot()
-            samples.forEach { sample ->
-                val spec = requireNotNull(healthApiMetrics.find { it.sourceKey == sample.key })
-                require(sample.value.isFinite() && sample.value >= 0 && sample.value <= 1e9)
-                val metric = old.metrics.find { it.sourceKey == sample.key } ?: spec
-                q.upsertHealthMetric(metric.id, metric.name, spec.unit, spec.kind.name, spec.aggregation.name, spec.sourceKey, false)
-                q.upsertHealthEntry("$source:${sample.key}:${sample.timestamp}", metric.id, sample.timestamp, sample.value.toString(), source)
+            val existing = q.selectHealthHistory(::HealthSnapshot).executeAsList()
+            require(existing.sortedBy { it.timestamp } == baseline.sortedBy { it.timestamp }) { "Записи изменились. Обновите предпросмотр." }
+            val basic = samples.filter { it.key == "sleep" || it.key == "steps" }
+            require(basic.all { it.value % 1.0 == 0.0 && it.value <= if (it.key == "sleep") 1560.0 else Int.MAX_VALUE.toDouble() })
+            basic.groupBy { it.timestamp }.forEach { (timestamp, rows) ->
+                val old = existing.find { it.timestamp == timestamp }
+                q.upsertHealth(timestamp, rows.find { it.key == "sleep" }?.value?.toInt() ?: old?.sleepMinutes,
+                    rows.find { it.key == "steps" }?.value?.toInt() ?: old?.steps)
             }
+            writeExtraSamples(samples.filterNot { it.key == "sleep" || it.key == "steps" }, source)
+        }
+    }
+    private fun validateSamples(samples: List<HealthApiSample>, source: String, maximum: Int) {
+        require(source in setOf("healthkit", "health-connect") && samples.size <= maximum)
+        require(samples.distinctBy { it.key to it.timestamp }.size == samples.size)
+        require(samples.all { it.value.isFinite() && it.value >= 0 && it.value <= 1e9 })
+    }
+    private fun writeExtraSamples(samples: List<HealthApiSample>, source: String) {
+        val old = q.metricSnapshot()
+        samples.forEach { sample ->
+            val spec = requireNotNull(healthApiMetrics.find { it.sourceKey == sample.key })
+            val metric = old.metrics.find { it.sourceKey == sample.key } ?: spec
+            q.upsertHealthMetric(metric.id, metric.name, spec.unit, spec.kind.name, spec.aggregation.name, spec.sourceKey, false)
+            q.upsertHealthEntry("$source:${sample.key}:${sample.timestamp}", metric.id, sample.timestamp, sample.value.toString(), source)
         }
     }
 }

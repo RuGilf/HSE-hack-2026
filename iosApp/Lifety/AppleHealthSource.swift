@@ -148,7 +148,11 @@ final class AppleMetricSource: IosMetricSource {
         return (type, unit, option)
     }
     func requestAccess(keys: [String], completion: @escaping (String?) -> Void) {
-        let types = Set(keys.compactMap { specification($0)?.0 })
+        let types = Set(keys.compactMap { key -> HKObjectType? in
+            if key == "sleep" { return HKObjectType.categoryType(forIdentifier: .sleepAnalysis) }
+            if key == "steps" { return HKObjectType.quantityType(forIdentifier: .stepCount) }
+            return specification(key)?.0
+        })
         guard available, !types.isEmpty, types.count == keys.count else { completion("Тип данных недоступен"); return }
         store.requestAuthorization(toShare: [], read: types) { success, error in
             DispatchQueue.main.async { completion(success ? nil : error?.localizedDescription ?? "Ошибка доступа") }

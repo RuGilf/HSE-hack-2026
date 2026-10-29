@@ -738,3 +738,29 @@ interface PersonRepository {
   При отдельном Calendar в панели «План» открывает Tasks; без него помнит вкладку.
 
 Подробности и проверка: [CUSTOM_HEALTH_AND_NAVIGATION.md](CUSTOM_HEALTH_AND_NAVIGATION.md).
+
+
+## 2026-10-30: переработка сценариев ввода и источников
+
+`HealthScreen(modifier)` теперь показывает обзор и один host ModalBottomSheet:
+выбор записи, форма, детали, редактор определения, архив и источник. Периоды и
+история находятся в деталях показателя. Числа/даты берутся из прежних репозиториев.
+`MetricEditorContent` / `MetricDetailContent` не создают вложенные sheets.
+`DeviceMetricsContent` объединяет шесть типов через `MetricDeviceSource`:
+sleep/steps + weight/resting-heart-rate/water/active-energy. Разрешения — только
+по кнопке получения, сохранение — отдельное. Старый HealthConnectSection остаётся
+совместимым платформенным компонентом; root больше не выводит второй импорт.
+
+Добавлен `HealthMetricsRepository.importDeviceSamples(samples, source, baseline)`
+с default UnsupportedOperationException. SQLDelight implementation атомарно
+проверяет прежнюю health history, сохраняет выбранные встроенные значения и
+дополнительные показатели. Не выбранные поля сохраняются; invalid/changed preview
+откатывает транзакцию. Максимум 180 дневных значений (6 × 30); старый importSamples
+для четырёх дополнительных типов не меняет контракт. Schema остаётся 6.
+
+ConversationSettingsSheet: «Данные / Разговор», прежний явный save preferences.
+TaskDateTimeField сворачивает controls, сохраняя value/callback; TaskEditorScreen
+раскрывает duration/approach/goalId по действию, не очищая их. Routes, entry signatures,
+публичные прежние модели, права ИИ, темы и native tab overlay сохранены.
+
+Источники решений и проверка: [UX_REDESIGN.md](UX_REDESIGN.md).

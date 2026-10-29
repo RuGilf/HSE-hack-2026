@@ -5,6 +5,7 @@ import java.nio.file.Files
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import ru.lifety.core.di.AppContainer
+import ru.lifety.core.model.HealthSnapshot
 import ru.lifety.core.model.Task
 import ru.lifety.core.model.HealthMetric
 import ru.lifety.core.model.*
@@ -101,6 +102,31 @@ class HealthMetricsPersistenceTest {
             assertNull(planning.observeReport().first())
             assertEquals("request", exchange.observe().first().draft!!.id)
             assertEquals(snapshot, planning.snapshot())
+        }
+    }
+
+    @Test fun unifiedDeviceImportIsAtomicIdempotentAndChecksPreviewFreshness() = runBlocking {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY); LifetyDatabase.Schema.create(driver)
+        AppContainer(driver).use { app ->
+            val metrics = app.repositories.healthMetrics!!
+            val health = app.repositories.health
+            health.update(HealthSnapshot(100, 420, 8000))
+            val baseline = health.observeAll().first()
+            val invalid = listOf(HealthApiSample("sleep", 100, 480.0), HealthApiSample("unknown", 100, 5.0))
+            assertFailsWith<IllegalArgumentException> { metrics.importDeviceSamples(invalid, "healthkit", baseline) }
+            assertEquals(baseline, health.observeAll().first())
+            assertTrue(metrics.snapshot().metrics.isEmpty())
+            val rows = listOf(HealthApiSample("sleep", 100, 480.0), HealthApiSample("weight", 100, 75.0))
+            metrics.importDeviceSamples(rows, "healthkit", baseline)
+            val after = health.observeAll().first()
+            assertEquals(HealthSnapshot(100, 480, 8000), after.single()) // Unselected steps remain known.
+            metrics.importDeviceSamples(rows, "healthkit", after)
+            assertEquals(1, metrics.snapshot().entries.size)
+            assertEquals(1, health.observeAll().first().size)
+            assertFailsWith<IllegalArgumentException> { metrics.importDeviceSamples(rows, "healthkit", baseline) }
+            assertEquals(after, health.observeAll().first())
+            assertFailsWith<IllegalArgumentException> { metrics.importDeviceSamples(listOf(HealthApiSample("steps", 200, 1.5)), "healthkit", after) }
+            assertEquals(after, health.observeAll().first())
         }
     }
 

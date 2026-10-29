@@ -1,5 +1,7 @@
 package ru.lifety.feature.tasks
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.height
@@ -70,6 +72,7 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
     val durationRequired = state.hadDetails || state.approach.isNotBlank() || state.goalId != null || state.duration.isNotBlank()
     val timingError = if (planning != null && durationRequired && state.duration.toIntOrNull()?.let { it in 1..1440 } != true)
         "Укажите длительность от 1 до 1440 минут" else state.task?.let { taskIntervalError(it, state.duration.toIntOrNull(), now) }
+    var detailsExpanded by rememberSaveable(taskId) { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var closing by remember { mutableStateOf(false) }
@@ -118,11 +121,15 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
                             }
                             TaskDateTimeField("Дедлайн", "Когда дело должно быть готово. Дата без уточнения времени — до 23:59.",
                                 task.deadlineAt, !state.saving, task.scheduledAt?.let { localDate(it) } ?: today(), true, model::setDeadlineAt)
-                            timingError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                             TaskDateTimeField("Когда заняться", "Необязательное время в расписании. Можно оставить только дедлайн.",
                                 task.scheduledAt, !state.saving, task.deadlineAt?.let { localDate(it) } ?: today(), false, model::setScheduledAt)
-                            if (planning != null) TaskDurationFields(state, model)
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            if (planning != null) {
+                                TextButton(onClick = { detailsExpanded = !detailsExpanded }, enabled = !state.saving) {
+                                    Text(if (detailsExpanded) "Скрыть детали" else state.duration.takeIf { it.isNotBlank() }?.let { "$it мин · детали задачи" } ?: "Добавить длительность, шаги или цель")
+                                }
+                                AnimatedVisibility(detailsExpanded, enter = ru.lifety.core.ui.LifetyMotion.RevealEnter, exit = ru.lifety.core.ui.LifetyMotion.RevealExit) { TaskDurationFields(state, model) }
+                            }
+                            if (taskId != null) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("Задача выполнена", style = MaterialTheme.typography.titleMedium)
                                     Text("Отметьте, когда всё готово", style = MaterialTheme.typography.bodySmall)

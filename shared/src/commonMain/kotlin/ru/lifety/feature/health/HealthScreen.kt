@@ -1,154 +1,250 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package ru.lifety.feature.health
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.Saver
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.catch
 import kotlinx.datetime.LocalDate
-import ru.lifety.core.time.formatDate
-import ru.lifety.core.time.localDate
+import ru.lifety.core.model.*
+import ru.lifety.core.model.HealthMetric as CustomMetric
+import ru.lifety.core.time.*
 import ru.lifety.core.ui.*
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HealthScreen(modifier: Modifier = Modifier) {
-    val repository = LocalRepositories.current?.health
-    key(repository) {
-        val scope = rememberCoroutineScope()
-        val controller = remember(repository, scope) { HealthController(repository, scope) }
-        val state by controller.state.collectAsState()
-        var periodName by rememberSaveable { mutableStateOf(HealthPeriod.WEEK.name) }
-        val period = HealthPeriod.valueOf(periodName)
-        var selectedDate by rememberSaveable { mutableStateOf("") }
-        var today by remember { mutableStateOf(localDate(Clock.System.now().toEpochMilliseconds())) }
-        LaunchedEffect(Unit) { while (true) { delay(60_000); today = localDate(Clock.System.now().toEpochMilliseconds()) } }
-        val timeline = remember(state.history, period, today) { healthTimeline(state.history, period, today) }
-        val selected = timeline.days.indexOfFirst { it.date.toString() == selectedDate }.takeIf { it >= 0 } ?: timeline.days.lastIndex
-        val day = timeline.days.getOrNull(selected)
-        var showImport by rememberSaveable { mutableStateOf(false) }
-        var showManual by rememberSaveable { mutableStateOf(false) }
-        var hours by rememberSaveable { mutableStateOf("") }
-        var minutes by rememberSaveable { mutableStateOf("") }
-        var steps by rememberSaveable { mutableStateOf("") }
-        var manualDate by rememberSaveable { mutableStateOf(today.toString()) }
-        var importBusy by remember { mutableStateOf(false) }
-        val formEnabled = !state.saving && !importBusy
-        val focus = LocalFocusManager.current
-        val keyboard = LocalSoftwareKeyboardController.current
-        val snackbar = remember { SnackbarHostState() }
-        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !state.saving })
-        LaunchedEffect(state.saved) {
-            if (state.saved) {
-                sheet.hide(); showManual = false; hours = ""; minutes = ""; steps = ""
-                snackbar.showSnackbar("Запись сохранена в истории")
-            }
+@Serializable
+private sealed interface HealthPanel {
+    @Serializable data object Add : HealthPanel
+    @Serializable data object Sources : HealthPanel
+    @Serializable data object Archive : HealthPanel
+    @Serializable data class Builtin(val sleep: Boolean) : HealthPanel
+    @Serializable data class Manual(val sleep: Boolean, val date: String? = null, val fromDetail: Boolean = false) : HealthPanel
+    @Serializable data class Metric(val metric: CustomMetric, val adding: Boolean = false) : HealthPanel
+    @Serializable data class Editor(val metric: CustomMetric) : HealthPanel
+}
+
+private val healthPanelSaver = Saver<HealthPanel?, String>(
+    save = { it?.let { panel -> Json.encodeToString<HealthPanel>(panel) } ?: "" },
+    restore = { value -> if (value.isEmpty()) null else runCatching { Json.decodeFromString<HealthPanel>(value) }.getOrNull() },
+)
+
+@Composable fun HealthScreen(modifier: Modifier = Modifier) {
+    val repositories = LocalRepositories.current
+    val repository = repositories?.health
+    if (repository == null) { PlaceholderScreen("Хранилище здоровья недоступно", modifier); return }
+    val metricRepo = repositories.healthMetrics
+    val scope = rememberCoroutineScope()
+    val controller = remember(repository, scope) { HealthController(repository, scope) }
+    val state by controller.state.collectAsState()
+    var metrics by remember { mutableStateOf(HealthMetricSnapshot()) }
+    var metricError by remember { mutableStateOf<String?>(null) }
+    var retry by remember { mutableIntStateOf(0) }
+    LaunchedEffect(metricRepo, retry) { metricRepo?.observe()?.catch { metricError = "Не удалось загрузить показатели" }?.collect { metrics = it; metricError = null } }
+    var panel by rememberSaveable(stateSaver = healthPanelSaver) { mutableStateOf<HealthPanel?>(null) }
+    var writing by remember { mutableStateOf(false) }
+    var importing by remember { mutableStateOf(false) }
+    val busy = writing || state.saving || importing
+    var now by remember { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
+    LaunchedEffect(Unit) { while (true) { delay(60_000); now = Clock.System.now().toEpochMilliseconds() } }
+    val today = localDate(now)
+    val history = remember(state.history, now) { state.history.filter { it.timestamp <= now }.sortedBy { it.timestamp } }
+    val sleep = history.lastOrNull { it.sleepMinutes != null }
+    val steps = history.lastOrNull { it.steps != null }
+    val inset = LocalBottomNavigationInset.current
+    val snackbar = remember { SnackbarHostState() }
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !writing && !controller.state.value.saving && !importing })
+    fun close() { if (!writing && !controller.state.value.saving && !importing) scope.launch { sheet.hide(); if (!sheet.isVisible) panel = null } }
+    fun write(action: suspend () -> Unit, finished: () -> Unit) {
+        if (busy) return
+        writing = true; metricError = null
+        scope.launch {
+            try { action(); metrics = metricRepo?.snapshot() ?: metrics; writing = false; finished() }
+            catch (c: CancellationException) { throw c }
+            catch (e: Exception) { metricError = e.message ?: "Не удалось сохранить запись" }
+            finally { writing = false }
         }
-        val bottomInset = ru.lifety.core.ui.LocalBottomNavigationInset.current
-        Scaffold(modifier = modifier, contentWindowInsets = WindowInsets(0, 0, 0, 0), snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = bottomInset)) }) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp,
-                bottom = 16.dp + bottomInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                item {
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        HealthPeriod.entries.forEachIndexed { index, option ->
-                            SegmentedButton(selected = option == period, onClick = { periodName = option.name; selectedDate = "" },
-                                shape = SegmentedButtonDefaults.itemShape(index, HealthPeriod.entries.size)) { Text(option.label) }
+    }
+    LaunchedEffect(state.saved) {
+        if (state.saved) { sheet.hide(); panel = null; snackbar.showSnackbar("Запись сохранена") }
+    }
+    Scaffold(modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = inset)) },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(onClick = { controller.clearSaveStatus(); metricError = null; panel = HealthPanel.Add },
+                modifier = Modifier.padding(bottom = inset).semantics { contentDescription = "Добавить запись здоровья" }, icon = { LifetyIcon(LifetySymbol.Plus) }, text = { Text("Запись") })
+        }) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 104.dp + inset),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Обзор", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                    Text(formatDate(today), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    SummaryMetricCard("Сон", sleep?.sleepMinutes?.let(::sleepLabel) ?: "Нет записей", sleep?.timestamp, LifetySymbol.Sleep, Modifier.weight(1f)) { panel = HealthPanel.Builtin(true) }
+                    SummaryMetricCard("Шаги", steps?.steps?.toString() ?: "Нет записей", steps?.timestamp, LifetySymbol.Steps, Modifier.weight(1f)) { panel = HealthPanel.Builtin(false) }
+                }
+            }
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Мои показатели", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { metricError = null; panel = HealthPanel.Editor(CustomMetric(Uuid.random().toString(), "")) }, enabled = metricRepo != null) { Text("Добавить") }
+                }
+                val active = metrics.metrics.filterNot { it.archived }
+                if (active.isEmpty()) Text("Что ещё хотите отслеживать? Например, настроение, воду или самочувствие.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Column {
+                        active.forEachIndexed { index, metric ->
+                            val last = metrics.entries.lastOrNull { it.metricId == metric.id && it.timestamp <= now }
+                            HealthNavigationRow(metric.name, last?.let { "${metricValueLabel(metric, it.value)} · ${formatDate(localDate(it.timestamp))}" } ?: "Добавьте первую запись") { panel = HealthPanel.Metric(metric) }
+                            if (index < active.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         }
                     }
                 }
-                if (repository == null) item { Text("Хранилище недоступно", color = MaterialTheme.colorScheme.error) }
-                if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-                item {
-                    FilledTonalButton(onClick = {
-                        controller.clearSaveStatus(); manualDate = (day?.date ?: today).toString(); showManual = true
-                    }, enabled = repository != null && formEnabled, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Добавить запись") }
+            }
+            item {
+                Text("Источники данных", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 10.dp))
+                Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    HealthNavigationRow(if (isIos) "Apple Health" else "Health Connect", "Сон, шаги и ещё 4 показателя") { panel = HealthPanel.Sources }
                 }
-                item { HealthMetricsSection() }
-                item { Text("История сна и движения", style = MaterialTheme.typography.titleMedium) }
-                item { HealthChart("Сон", timeline, selected, true) { selectedDate = timeline.days[it].date.toString() } }
-                item { HealthChart("Шаги", timeline, selected, false) { selectedDate = timeline.days[it].date.toString() } }
-                if (day != null) item {
-                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                TextButton(enabled = selected > 0, onClick = { selectedDate = timeline.days[selected - 1].date.toString() }) { Text("Назад") }
-                                Text(formatDate(day.date), style = MaterialTheme.typography.titleSmall)
-                                TextButton(enabled = selected < timeline.days.lastIndex, onClick = { selectedDate = timeline.days[selected + 1].date.toString() }) { Text("Вперёд") }
-                            }
-                            Text("Сон: ${sleepLabel(day.sleepMinutes)}")
-                            Text("Шаги: ${day.steps?.toString() ?: "Нет данных"}")
+                Text("Обновление по вашему действию", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, start = 4.dp))
+            }
+            if (metrics.metrics.any { it.archived }) item { TextButton(onClick = { panel = HealthPanel.Archive }) { Text("Архив показателей") } }
+            (metricError ?: state.error)?.let { message -> item {
+                Text(message, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { retry++; controller.reload() }) { Text("Повторить загрузку") }
+            } }
+        }
+    }
+    panel?.let { current ->
+        val title = when (current) {
+            HealthPanel.Add -> "Новая запись"; HealthPanel.Archive -> "Архив"; HealthPanel.Sources -> if (isIos) "Apple Health" else "Health Connect"
+            is HealthPanel.Builtin -> if (current.sleep) "Сон" else "Шаги"
+            is HealthPanel.Manual -> if (current.sleep) "Записать сон" else "Записать шаги"
+            is HealthPanel.Metric -> current.metric.name
+            is HealthPanel.Editor -> if (current.metric.name.isBlank()) "Новый показатель" else "Изменить показатель"
+        }
+        LifetyBottomSheet(onDismissRequest = { if (!busy) panel = null }, sheetState = sheet) {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().heightIn(max = maxHeight * .92f).imePadding()) {
+                Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val back: HealthPanel? = when (current) {
+                        is HealthPanel.Manual -> if (current.fromDetail) HealthPanel.Builtin(current.sleep) else HealthPanel.Add
+                        is HealthPanel.Editor -> if (current.metric.name.isBlank()) HealthPanel.Add else HealthPanel.Metric(current.metric)
+                        is HealthPanel.Metric -> if (current.adding) HealthPanel.Add else null
+                        else -> null
+                    }
+                    if (back != null) IconButton(onClick = { metricError = null; panel = back }, enabled = !busy, modifier = Modifier.semantics { contentDescription = "Назад" }) { LifetyIcon(LifetySymbol.Back) }
+                    Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).padding(horizontal = 12.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    IconButton(onClick = ::close, enabled = !busy, modifier = Modifier.semantics { contentDescription = "Закрыть здоровье" }) { LifetyIcon(LifetySymbol.Close) }
+                }
+                HorizontalDivider()
+                key(current) {
+                    when (current) {
+                        HealthPanel.Add -> LazyColumn(contentPadding = PaddingValues(20.dp)) {
+                            item { Text("Что записать?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            item { HealthNavigationRow("Сон", "Продолжительность за день") { controller.clearSaveStatus(); panel = HealthPanel.Manual(true) } }
+                            item { HealthNavigationRow("Шаги", "Количество за день") { controller.clearSaveStatus(); panel = HealthPanel.Manual(false) } }
+                            items(metrics.metrics.filterNot { it.archived }, key = { it.id }) { metric -> HealthNavigationRow(metric.name, metric.unit.ifBlank { when (metric.kind) { MetricKind.TEXT -> "Заметка"; MetricKind.BOOLEAN -> "Да или нет"; else -> "Число" } }) { panel = HealthPanel.Metric(metric, true) } }
+                            item { HorizontalDivider(); TextButton(onClick = { panel = HealthPanel.Editor(CustomMetric(Uuid.random().toString(), "")) }, enabled = metricRepo != null) { Text("Создать свой показатель") } }
+                        }
+                        HealthPanel.Archive -> LazyColumn(contentPadding = PaddingValues(20.dp)) {
+                            items(metrics.metrics.filter { it.archived }, key = { it.id }) { metric -> HealthNavigationRow(metric.name, "Записи сохранены") { panel = HealthPanel.Metric(metric) } }
+                        }
+                        HealthPanel.Sources -> DeviceMetricsContent(repository, metricRepo, onBusyChanged = { importing = it }, onSaved = { close() })
+                        is HealthPanel.Builtin -> BuiltinHealthContent(current.sleep, history, today, onAdd = { selected -> controller.clearSaveStatus(); panel = HealthPanel.Manual(current.sleep, selected.toString(), true) })
+                        is HealthPanel.Manual -> ManualHealthContent(current.sleep, current.date ?: today.toString(), state, controller)
+                        is HealthPanel.Editor -> MetricEditorContent(current.metric, metrics.entries.any { it.metricId == current.metric.id }, writing, metricError, ::close) { value ->
+                            write({ requireNotNull(metricRepo).saveMetric(value) }) { if (value.archived) close() else panel = HealthPanel.Metric(value, current.metric.name.isBlank()) }
+                        }
+                        is HealthPanel.Metric -> {
+                            val metric = metrics.metrics.find { it.id == current.metric.id } ?: current.metric
+                            MetricDetailContent(metric, metrics.entries.filter { it.metricId == metric.id }, writing, metricError, ::close, current.adding,
+                                onEdit = { metricError = null; panel = HealthPanel.Editor(metric) },
+                                onSave = { entry -> write({ requireNotNull(metricRepo).saveEntry(entry) }, ::close) },
+                                onDelete = { entry -> write({ requireNotNull(metricRepo).deleteEntry(entry.id) }) {} })
                         }
                     }
                 }
-                item {
-                    Card(Modifier.fillMaxWidth()) {
-                        ListItem(modifier = Modifier.clickable(enabled = !importBusy) { showImport = !showImport },
-                            headlineContent = { Text(if (isIos) "Импорт из Apple Health" else "Импорт Health Connect") }, supportingContent = { Text("Сон и шаги за последние 30 дней") },
-                            trailingContent = { Text(if (showImport) "Скрыть" else "Открыть", color = MaterialTheme.colorScheme.primary) })
-                        AnimatedVisibility(showImport, enter = LifetyMotion.RevealEnter, exit = LifetyMotion.RevealExit) {
-                            HealthConnectSection(repository, enabled = repository != null && !state.saving, onBusyChanged = { importBusy = it })
-                        }
-                    }
-                }
-                state.error?.let { error -> item {
-                    Text(error, color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = controller::reload, enabled = formEnabled) { Text("Обновить историю") }
-                } }
-                item {
-                    Text("По дням", style = MaterialTheme.typography.titleMedium)
-                    Text("${timeline.records} записей за период. За день показано последнее известное значение каждого показателя. Пропуски не считаются нулём.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                val recorded = timeline.days.filter { it.records > 0 }.asReversed()
-                if (recorded.isEmpty()) item { Text("Здесь появятся сохранённые записи и импортированные дни.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                items(recorded, key = { it.date.toString() }, contentType = { "health-day" }) { entry ->
-                    ListItem(modifier = Modifier.animateItem().clickable { selectedDate = entry.date.toString() },
-                        headlineContent = { Text(formatDate(entry.date)) },
-                        supportingContent = { Text("Сон: ${sleepLabel(entry.sleepMinutes)} · Шаги: ${entry.steps?.toString() ?: "Нет данных"}") })
-                }
+            }
             }
         }
-        if (showManual) LifetyBottomSheet(onDismissRequest = { if (!state.saving) showManual = false }, sheetState = sheet) {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Запись здоровья", style = MaterialTheme.typography.titleLarge)
-                LifetyDateField("Дата показателей", manualDate, { manualDate = it }, enabled = formEnabled)
-                Text("Сон и шаги за выбранный день. Пустое поле — нет нового значения.", style = MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(hours, { hours = it.take(4) }, Modifier.weight(1f), enabled = formEnabled, singleLine = true,
-                        label = { Text("Сон, часы") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }))
-                    OutlinedTextField(minutes, { minutes = it.take(4) }, Modifier.weight(1f), enabled = formEnabled, singleLine = true,
-                        label = { Text("Минуты") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }))
-                }
-                OutlinedTextField(steps, { steps = it.take(8) }, Modifier.fillMaxWidth(), enabled = formEnabled, singleLine = true,
-                    label = { Text("Шаги за день") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { keyboard?.hide(); focus.clearFocus() }))
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                Button(onClick = {
-                    keyboard?.hide(); focus.clearFocus(); controller.save(hours, minutes, steps, LocalDate.parse(manualDate))
-                }, enabled = repository != null && formEnabled, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Text(if (state.saving) "Сохранение…" else "Сохранить в историю")
-                }
-                TextButton(onClick = { scope.launch { sheet.hide(); showManual = false } }, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) { Text("Отмена") }
+    }
+}
+
+@Composable private fun SummaryMetricCard(title: String, value: String, timestamp: Long?, symbol: LifetySymbol, modifier: Modifier, onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { LifetyIcon(symbol, Modifier.size(20.dp), MaterialTheme.colorScheme.primary); Text(title, style = MaterialTheme.typography.titleSmall) }
+            Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 2)
+            Text(timestamp?.let { formatDate(localDate(it)) } ?: "Начните отслеживать", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable internal fun HealthNavigationRow(title: String, subtitle: String, onClick: () -> Unit) {
+    ListItem(modifier = Modifier.clickable(onClick = onClick), colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+        headlineContent = { Text(title) }, supportingContent = { Text(subtitle, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        trailingContent = { LifetyIcon(LifetySymbol.Chevron, Modifier.size(20.dp), MaterialTheme.colorScheme.onSurfaceVariant) })
+}
+
+@Composable private fun BuiltinHealthContent(sleep: Boolean, history: List<HealthSnapshot>, today: LocalDate, onAdd: (LocalDate) -> Unit) {
+    var periodName by rememberSaveable { mutableStateOf(HealthPeriod.WEEK.name) }
+    val period = HealthPeriod.valueOf(periodName)
+    val timeline = remember(history, period, today) { healthTimeline(history, period, today) }
+    var selectedDate by remember { mutableStateOf("") }
+    val selected = timeline.days.indexOfFirst { it.date.toString() == selectedDate }.takeIf { it >= 0 } ?: timeline.days.lastIndex
+    val day = timeline.days.getOrNull(selected)
+    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) { HealthPeriod.entries.forEachIndexed { i, option -> SegmentedButton(period == option, { periodName = option.name; selectedDate = "" }, SegmentedButtonDefaults.itemShape(i, HealthPeriod.entries.size)) { Text(option.label) } } } }
+        item { HealthChart(if (sleep) "Сон" else "Шаги", timeline, selected, sleep) { selectedDate = timeline.days[it].date.toString() } }
+        if (day != null) item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { selectedDate = timeline.days[selected - 1].date.toString() }, enabled = selected > 0) { Text("Назад") }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(formatDate(day.date), style = MaterialTheme.typography.labelMedium); Text(if (sleep) sleepLabel(day.sleepMinutes) else day.steps?.toString() ?: "Нет данных") }
+                TextButton(onClick = { selectedDate = timeline.days[selected + 1].date.toString() }, enabled = selected < timeline.days.lastIndex) { Text("Вперёд") }
             }
         }
+        item { Button(onClick = { onAdd(day?.date ?: today) }, modifier = Modifier.fillMaxWidth()) { Text("Добавить запись") } }
+        item { Text("История", style = MaterialTheme.typography.titleMedium) }
+        items(timeline.days.filter { if (sleep) it.sleepMinutes != null else it.steps != null }.asReversed(), key = { it.date.toString() }) { row ->
+            ListItem(headlineContent = { Text(if (sleep) sleepLabel(row.sleepMinutes) else "${row.steps} шагов") }, supportingContent = { Text(formatDate(row.date)) }, modifier = Modifier.clickable { selectedDate = row.date.toString() })
+        }
+    }
+}
+
+@Composable private fun ManualHealthContent(sleep: Boolean, initialDate: String, state: HealthUiState, controller: HealthController) {
+    var date by rememberSaveable { mutableStateOf(initialDate) }
+    var hours by rememberSaveable { mutableStateOf("") }; var minutes by rememberSaveable { mutableStateOf("") }; var steps by rememberSaveable { mutableStateOf("") }
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (sleep) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(hours, { hours = it.take(2) }, Modifier.weight(1f), label = { Text("Часы") }, singleLine = true, enabled = !state.saving, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            OutlinedTextField(minutes, { minutes = it.take(2) }, Modifier.weight(1f), label = { Text("Минуты") }, singleLine = true, enabled = !state.saving, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        } else OutlinedTextField(steps, { steps = it.take(8) }, Modifier.fillMaxWidth(), label = { Text("Шаги за день") }, singleLine = true, enabled = !state.saving, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        LifetyDateField("Дата", date, { date = it }, enabled = !state.saving)
+        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        Button(onClick = { controller.save(hours, minutes, steps, LocalDate.parse(date)) }, enabled = !state.saving && (if (sleep) hours.isNotBlank() || minutes.isNotBlank() else steps.isNotBlank()), modifier = Modifier.fillMaxWidth()) { Text(if (state.saving) "Сохраняем…" else "Сохранить запись") }
     }
 }
