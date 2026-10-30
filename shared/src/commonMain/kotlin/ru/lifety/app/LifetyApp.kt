@@ -15,15 +15,11 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -36,8 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -54,9 +48,6 @@ import ru.lifety.core.navigation.LocalPlannerNavigation
 import ru.lifety.core.navigation.PlannerNavigation
 import ru.lifety.core.repository.Repositories
 import ru.lifety.core.ui.LifetyMotion
-import ru.lifety.core.ui.LifetyIcon
-import ru.lifety.core.ui.LifetyMascot
-import ru.lifety.core.ui.LifetySymbol
 import ru.lifety.core.ui.LifetyTheme
 import ru.lifety.core.ui.PlanningProvider
 import ru.lifety.core.ui.LocalRepositories
@@ -137,18 +128,11 @@ private fun LifetyContent(repositories: Repositories?) {
                     Scaffold(
                         contentWindowInsets = if (isIos && !isEditor) WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal) else ScaffoldDefaults.contentWindowInsets,
                         topBar = {
-                            if (!isEditor) TopAppBar(
-                                title = { Text(if (section == AppDestination.DASHBOARD) "Lifety" else section.title, style = MaterialTheme.typography.titleLarge) },
-                                navigationIcon = {
-                                    if (section == AppDestination.DASHBOARD) LifetyMascot(Modifier.padding(start = 12.dp).size(32.dp), animated = false)
-                                },
-                                actions = {
-                                    IconButton(onClick = { settingsEpoch = lockState.epoch; more = true }, modifier = Modifier.semantics { contentDescription = "Все разделы" }) { LifetyIcon(LifetySymbol.More) }
-                                    IconButton(onClick = { settingsEpoch = lockState.epoch; settings = true }, modifier = Modifier.semantics { contentDescription = "Настройки" }) {
-                                        LifetyIcon(LifetySymbol.Settings, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                },
-                                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                            if (!isEditor) PlatformTopBar(
+                                title = if (section == AppDestination.DASHBOARD) "Lifety" else section.title,
+                                showMascot = section == AppDestination.DASHBOARD,
+                                onSections = { settingsEpoch = lockState.epoch; more = true },
+                                onSettings = { settingsEpoch = lockState.epoch; settings = true },
                             )
                         },
                         bottomBar = {

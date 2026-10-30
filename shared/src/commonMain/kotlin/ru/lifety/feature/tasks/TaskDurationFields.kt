@@ -19,7 +19,6 @@ import kotlin.time.Instant
 @Composable
 internal fun TaskDurationFields(state: TaskEditorState, model: TaskEditorViewModel) {
     val task = state.task ?: return
-    var endPicker by remember { mutableStateOf(false) }
     var goalPicker by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val duration = state.duration.toIntOrNull()?.takeIf { it in 1..1440 }
@@ -39,7 +38,13 @@ internal fun TaskDurationFields(state: TaskEditorState, model: TaskEditorViewMod
         }
         if (task.scheduledAt != null) {
             Text(end?.let { "${formatDateTime(task.scheduledAt)} → ${formatDateTime(it)}" } ?: "Укажите длительность, чтобы увидеть окончание", style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = { endPicker = true }, enabled = !state.saving) { Text("Выбрать время окончания") }
+            val initial = Instant.fromEpochMilliseconds(end ?: (task.scheduledAt + 30 * 60_000)).toLocalDateTime(TimeZone.currentSystemDefault())
+            ru.lifety.core.ui.LifetyTimeField("Время окончания", initial.hour, initial.minute, { hour, minute ->
+                try { model.setDuration(durationUntil(task.scheduledAt, hour, minute).toString()); error = null }
+                catch (invalid: IllegalArgumentException) { error = invalid.message }
+            }, enabled = !state.saving)
+            Text("Время раньше начала означает следующий день.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         OutlinedTextField(state.approach, model::setApproach, Modifier.fillMaxWidth(), label = { Text("Шаги выполнения · необязательно") },
@@ -52,16 +57,5 @@ internal fun TaskDurationFields(state: TaskEditorState, model: TaskEditorViewMod
                 goals.filterNot { it.isCompleted }.forEach { goal -> DropdownMenuItem(text = { Text(goal.title) }, onClick = { model.setGoal(goal.id); goalPicker = false }) }
             }
         }
-    }
-    if (endPicker && task.scheduledAt != null) {
-        val initial = Instant.fromEpochMilliseconds(end ?: (task.scheduledAt + 30 * 60_000)).toLocalDateTime(TimeZone.currentSystemDefault())
-        val picker = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
-        AlertDialog(onDismissRequest = { endPicker = false }, title = { Text("Когда закончить") },
-            text = { Column { Text("Время раньше начала означает следующий день.", style = MaterialTheme.typography.bodySmall); TimeInput(picker) } },
-            confirmButton = { TextButton(onClick = {
-                try { model.setDuration(durationUntil(task.scheduledAt, picker.hour, picker.minute).toString()); error = null }
-                catch (invalid: IllegalArgumentException) { error = invalid.message }
-                endPicker = false
-            }) { Text("Готово") } }, dismissButton = { TextButton(onClick = { endPicker = false }) { Text("Отмена") } })
     }
 }

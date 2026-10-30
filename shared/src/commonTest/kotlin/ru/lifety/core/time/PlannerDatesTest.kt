@@ -14,6 +14,18 @@ import kotlin.time.Instant
 
 class PlannerDatesTest {
     @Test
+    fun nativeDatePickerPreservesCivilDatesInBothExtremeOffsetsAndDstChanges() {
+        for (zoneId in listOf("Pacific/Kiritimati", "Etc/GMT+12", "Europe/Moscow", "Europe/Berlin", "America/Sao_Paulo")) {
+            val zone = TimeZone.of(zoneId)
+            for (date in listOf(LocalDate(2026, 10, 30), LocalDate(2026, 3, 29), LocalDate(2026, 10, 25), LocalDate(2018, 11, 4), LocalDate(2028, 2, 29))) {
+                val timestamp = localDatePickerMillis(date, zone)
+                assertEquals(date, localDate(timestamp, zone), "$zoneId: $date")
+                assertEquals(12, Instant.fromEpochMilliseconds(timestamp).toLocalDateTime(zone).hour)
+            }
+        }
+    }
+
+    @Test
     fun calendarUsesLocalDatesAndDoesNotDuplicateScheduleAndDeadline() {
         val zone = TimeZone.of("Europe/Moscow")
         val day = LocalDate(2026, 10, 25)

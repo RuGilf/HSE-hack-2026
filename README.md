@@ -35,6 +35,14 @@ Health API и полный ручной CRUD на iPhone не проверены
 Переработка интерфейса по материалам Todoist, Apple Health и Bear, сценарии и
 проверки — [docs/UX_REDESIGN.md](docs/UX_REDESIGN.md).
 
+## Нативные элементы iOS
+
+На iPhone верхняя панель — UIKit UINavigationBar с SF Symbols, переключатели
+Плана, периодов здоровья/финансов и настроек контекста — UISegmentedControl.
+Даты и время выбираются системным UIDatePicker прямо из формы, переключатели
+состояния — UISwitch. Android сохраняет Material 3. Контракты и результаты
+проверки — [docs/IOS_NATIVE_UI.md](docs/IOS_NATIVE_UI.md).
+
 ## Запуск Android
 
 Нужны JDK 21, Android SDK Platform 37 (`platforms;android-37.0`), Build Tools

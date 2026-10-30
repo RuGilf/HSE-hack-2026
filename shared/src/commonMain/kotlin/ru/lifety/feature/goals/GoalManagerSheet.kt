@@ -99,7 +99,7 @@ private fun ColumnScope.GoalEditor(initial: Goal, enabled: Boolean, onSave: (Goa
             TextButton(onClick = { date = null }, enabled = enabled) { Text("Убрать срок") }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Цель достигнута", modifier = Modifier.weight(1f)); Switch(completed, { completed = it }, enabled = enabled)
+            Text("Цель достигнута", modifier = Modifier.weight(1f)); ru.lifety.core.ui.LifetySwitch(completed, { completed = it }, enabled = enabled)
         }
         onDelete?.let { TextButton(onClick = it, enabled = enabled) { Text("Удалить цель", color = MaterialTheme.colorScheme.error) } }
     }

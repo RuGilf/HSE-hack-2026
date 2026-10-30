@@ -5,6 +5,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import ru.lifety.core.ui.isIos
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,7 +28,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -86,7 +87,14 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
             containerColor = MaterialTheme.colorScheme.background) {
             Scaffold(modifier = Modifier.fillMaxWidth().height(sheetHeight), contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 topBar = {
-                    TopAppBar(title = { Text(if (taskId == null) "Новая задача" else "Редактирование", style = MaterialTheme.typography.titleLarge) },
+                    if (isIos) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = close, enabled = !state.saving && !closing) { Text("Отмена") }
+                        BoxWithConstraints(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Text(if (taskId == null) "Новая задача" else "Задача", style = MaterialTheme.typography.titleMedium)
+                        }
+                        if (taskId != null && state.task != null) TextButton(onClick = { confirmDelete = true }, enabled = !state.saving) { Text("Удалить", color = MaterialTheme.colorScheme.error) }
+                        else Spacer(Modifier.size(80.dp, 48.dp))
+                    } else TopAppBar(title = { Text(if (taskId == null) "Новая задача" else "Редактирование", style = MaterialTheme.typography.titleLarge) },
                         navigationIcon = { IconButton(onClick = close, enabled = !state.saving && !closing, modifier = Modifier.semantics { contentDescription = "Закрыть редактор" }) { LifetyIcon(LifetySymbol.Close) } },
                         windowInsets = WindowInsets(0, 0, 0, 0),
                         actions = { if (taskId != null && state.task != null) TextButton(onClick = { confirmDelete = true }, enabled = !state.saving) { Text("Удалить", color = MaterialTheme.colorScheme.error) } })
@@ -134,7 +142,7 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
                                     Text("Задача выполнена", style = MaterialTheme.typography.titleMedium)
                                     Text("Отметьте, когда всё готово", style = MaterialTheme.typography.bodySmall)
                                 }
-                                Switch(checked = task.isCompleted, onCheckedChange = model::setCompleted, enabled = !state.saving,
+                                ru.lifety.core.ui.LifetySwitch(checked = task.isCompleted, onCheckedChange = model::setCompleted, enabled = !state.saving,
                                     modifier = Modifier.semantics { contentDescription = "Задача выполнена" })
                             }
                             Text("Часовой пояс: ${TimeZone.currentSystemDefault().id}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

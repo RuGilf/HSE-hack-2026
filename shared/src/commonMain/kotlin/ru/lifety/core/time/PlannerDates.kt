@@ -29,6 +29,11 @@ fun formatDateTime(timestamp: Long, zone: TimeZone = TimeZone.currentSystemDefau
 fun datePickerMillis(timestamp: Long, zone: TimeZone = TimeZone.currentSystemDefault()): Long =
     localDate(timestamp, zone).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
 
+/** UIKit's date-only picker uses the local calendar, including its Today marker.
+ * Noon avoids DST transitions at midnight; decode its result in the same zone. */
+internal fun localDatePickerMillis(date: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): Long =
+    LocalDateTime(date, kotlinx.datetime.LocalTime(12, 0)).toInstant(zone).toEpochMilliseconds()
+
 fun changeDate(timestamp: Long, pickerMillis: Long, zone: TimeZone = TimeZone.currentSystemDefault()): Long {
     val date = localDate(pickerMillis, TimeZone.UTC)
     val time = Instant.fromEpochMilliseconds(timestamp).toLocalDateTime(zone)

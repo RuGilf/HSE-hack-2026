@@ -218,7 +218,7 @@ private val healthPanelSaver = Saver<HealthPanel?, String>(
     val selected = timeline.days.indexOfFirst { it.date.toString() == selectedDate }.takeIf { it >= 0 } ?: timeline.days.lastIndex
     val day = timeline.days.getOrNull(selected)
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) { HealthPeriod.entries.forEachIndexed { i, option -> SegmentedButton(period == option, { periodName = option.name; selectedDate = "" }, SegmentedButtonDefaults.itemShape(i, HealthPeriod.entries.size)) { Text(option.label) } } } }
+        item { LifetySegmentedControl(HealthPeriod.entries.map { it.label }, HealthPeriod.entries.indexOf(period), { periodName = HealthPeriod.entries[it].name; selectedDate = "" }, Modifier.fillMaxWidth()) }
         item { HealthChart(if (sleep) "Сон" else "Шаги", timeline, selected, sleep) { selectedDate = timeline.days[it].date.toString() } }
         if (day != null) item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

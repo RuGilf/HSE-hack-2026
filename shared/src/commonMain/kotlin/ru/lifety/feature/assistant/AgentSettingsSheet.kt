@@ -79,5 +79,5 @@ import kotlinx.coroutines.flow.catch
 }
 
 @Composable private fun ScopeToggle(label: String, checked: Boolean, enabled: Boolean, change: (Boolean) -> Unit) {
-    ListItem(headlineContent = { Text(label) }, trailingContent = { Switch(checked, change, enabled = enabled) }, colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface))
+    ListItem(headlineContent = { Text(label) }, trailingContent = { ru.lifety.core.ui.LifetySwitch(checked, change, enabled = enabled) }, colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface))
 }

@@ -12,6 +12,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import ru.lifety.core.appearance.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 
 /** Material roles are derived once per selected palette; feature screens keep using MaterialTheme. */
 internal fun LifetyPalette.colorScheme(): androidx.compose.material3.ColorScheme {
@@ -64,6 +67,25 @@ private val shapes = Shapes(
 // Material 3's type scale keeps controls and content aligned with Android conventions.
 private val typography = Typography()
 
+// iOS text sizes and tighter tracking; sp retains the user's system text scaling.
+private fun iosText(size: Int, line: Int, weight: FontWeight = FontWeight.Normal) =
+    TextStyle(fontSize = size.sp, lineHeight = line.sp, fontWeight = weight, letterSpacing = 0.sp)
+private val iosTypography = Typography(
+    displayLarge = iosText(40, 46, FontWeight.Bold),
+    displayMedium = iosText(34, 41, FontWeight.Bold),
+    displaySmall = iosText(28, 34, FontWeight.Bold),
+    headlineLarge = iosText(34, 41, FontWeight.Bold),
+    headlineMedium = iosText(28, 34, FontWeight.Bold),
+    headlineSmall = iosText(22, 28, FontWeight.Bold),
+    titleLarge = iosText(22, 28, FontWeight.SemiBold),
+    titleMedium = iosText(17, 22, FontWeight.SemiBold),
+    titleSmall = iosText(15, 20, FontWeight.SemiBold),
+    bodyLarge = iosText(17, 22), bodyMedium = iosText(15, 20), bodySmall = iosText(13, 18),
+    labelLarge = iosText(15, 20, FontWeight.Medium),
+    labelMedium = iosText(12, 16, FontWeight.Medium), labelSmall = iosText(11, 14),
+)
+private val iosShapes = shapes.copy(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(16.dp))
+
 @Composable
 fun LifetyTheme(content: @Composable () -> Unit) {
     val appearance = rememberAppearanceController()
@@ -71,6 +93,7 @@ fun LifetyTheme(content: @Composable () -> Unit) {
     val colors = remember(state.theme) { state.theme.colorScheme() }
     ApplyPlatformAppearance(state.theme.palette)
     CompositionLocalProvider(LocalAppearance provides appearance) {
-        MaterialTheme(colorScheme = colors, shapes = shapes, typography = typography, content = content)
+        MaterialTheme(colorScheme = colors, shapes = if (isIos) iosShapes else shapes,
+            typography = if (isIos) iosTypography else typography, content = content)
     }
 }

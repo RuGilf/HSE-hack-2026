@@ -24,6 +24,7 @@ import ru.lifety.core.ui.LifetyMotion
 import ru.lifety.core.ui.LocalRepositories
 import ru.lifety.core.ui.LocalBottomNavigationInset
 import ru.lifety.core.ui.LifetyDateField
+import ru.lifety.core.ui.LifetySegmentedControl
 import ru.lifety.core.ui.LifetyEmptyState
 import ru.lifety.core.ui.LifetyEmotion
 import ru.lifety.core.ui.LifetyIcon
@@ -152,7 +153,19 @@ fun FinanceContent(
             }
         }
         item {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (isIos) {
+                val selectedPeriod = if (allTime) FinancePeriod.entries.size else FinancePeriod.entries.indexOfFirst { period ->
+                    val range = financePeriodDates(period, today)
+                    fromText == range.from.toString() && toText == range.until.previousDay().toString()
+                }
+                LifetySegmentedControl(FinancePeriod.entries.map { it.title } + "Всё", selectedPeriod, { index ->
+                    if (index == FinancePeriod.entries.size) allTime = true
+                    else {
+                        val range = financePeriodDates(FinancePeriod.entries[index], today)
+                        allTime = false; fromText = range.from.toString(); toText = range.until.previousDay().toString()
+                    }
+                }, Modifier.fillMaxWidth(), enabled = !state.saving)
+            } else Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FinancePeriod.entries.forEach { period ->
                     val range = financePeriodDates(period, today)
                     val end = range.until.previousDay().toString()

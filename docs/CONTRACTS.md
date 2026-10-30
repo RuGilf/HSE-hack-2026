@@ -764,3 +764,42 @@ TaskDateTimeField сворачивает controls, сохраняя value/callba
 публичные прежние модели, права ИИ, темы и native tab overlay сохранены.
 
 Источники решений и проверка: [UX_REDESIGN.md](UX_REDESIGN.md).
+
+
+## Нативные элементы iOS — 30 октября 2026
+
+Публичные модели, репозитории, маршруты, DI, сигнатуры экранов и схема 6 не меняются.
+
+- `C/app/PlatformTopBar.kt`: внутренний expect `PlatformTopBar(title, showMascot,
+  onSections, onSettings)`. Actual Android — прежняя TopAppBar с маскотом;
+  actual iOS — прозрачная UINavigationBar, SF Symbols, верхняя safe area.
+  Нижний UITabBar и его overlay/inset контракт не меняются.
+- `C/core/ui/LifetyDateField.kt`: прежняя публичная сигнатура теперь expect;
+  actual `A/core/ui/LifetyDateField.android.kt` сохраняет Material DatePicker,
+  `I/core/ui/LifetyDateField.ios.kt` использует компактный UIKit UIDatePicker.
+  Значение остаётся ISO civil date. Для UIKit дата кодируется локальным полуднем
+  и декодируется в том же часовом поясе; UTC midnight остаётся Android-контрактом.
+  В нативном календаре понедельник — первый день недели.
+- `C/feature/tasks/TaskDateTimeField.kt`: прежняя внутренняя сигнатура — expect.
+  Actual Android перенесён без изменения поведения; actual iOS — необязательные
+  значения с «Указать»/«Убрать» и компактным UIDatePicker dateAndTime.
+  Все изменения относятся к черновику редактора; запись только через Save.
+- `C/core/ui/LifetyTimeField.kt`: внутренний expect `LifetyTimeField(label, hour,
+  minute, onChange, modifier, enabled)` для окончания задачи. Android использует
+  TimeInput dialog, iOS — native time-only picker. Время без даты кодируется в UTC;
+  существующий `durationUntil` считает длительность в часовом поясе плана.
+- `C/core/ui/LifetySegmentedControl.kt`: внутренний expect с labels, индексом
+  selected, onSelect, modifier, enabled. Android — Material segmented buttons,
+  iOS — UISegmentedControl. Индекс -1 означает произвольный диапазон финансов.
+- `C/core/ui/LifetySwitch.kt`: внутренний expect checked/onCheckedChange/modifier/
+  enabled. Android — M3 Switch, iOS — UISwitch с intrinsicContentSize текущей ОС.
+- `I/core/ui/IosDatePicker.kt`: только UIKit binding; callbacks используют
+  rememberUpdatedState, targets удаляются на release. Встроенные controls
+  находятся под Metal canvas и кооперативно передают жесты прокрутке. Overlay
+  нужен только фиксированным верхней и нижней панелям, не содержимому форм.
+- LifetyTheme выбирает iOS text scale 34/28/22/17/15/13 sp и более мягкие углы
+  inputs только на iOS; общий источник палитр и системное масштабирование сохранены.
+
+Формат времени в нативных controls следует настройке iOS 12/24 часа; сохранение
+по-прежнему epoch milliseconds, общие текстовые подписи плана — 24-часовые.
+Границы ручной проверки — [IOS_NATIVE_UI.md](IOS_NATIVE_UI.md).

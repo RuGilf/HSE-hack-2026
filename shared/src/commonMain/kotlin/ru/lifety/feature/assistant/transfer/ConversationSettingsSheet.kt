@@ -46,9 +46,8 @@ internal fun ConversationSettingsSheet(preferences: ChatGptPreferences, busy: Bo
                 Text("Контекст для ChatGPT", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 TextButton(onClick = onDismiss, enabled = !busy) { Text("Отмена") }
             }
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                listOf("Данные", "Разговор").forEachIndexed { i, label -> SegmentedButton(tab == i, { tab = i }, SegmentedButtonDefaults.itemShape(i, 2)) { Text(label) } }
-            }
+            ru.lifety.core.ui.LifetySegmentedControl(listOf("Данные", "Разговор"), tab, { tab = it },
+                Modifier.fillMaxWidth().padding(vertical = 12.dp), enabled = !busy)
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (tab == 0) {
                     Text("Выберите, что включить в следующий запрос.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -81,7 +81,8 @@ fun TasksScreen(modifier: Modifier = Modifier) {
             if (!allDates) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { selectedIso = selected.plus(DatePeriod(days = -1)).toString() },
                     modifier = Modifier.semantics { contentDescription = "Предыдущий день" }) { Text("‹", style = MaterialTheme.typography.headlineSmall) }
-                FilledTonalButton(onClick = { showDate = true }, modifier = Modifier.weight(1f)
+                if (isIos) LifetyDateField("День плана", selected.toString(), { selectedIso = it.takeUnless { it == today.toString() } }, Modifier.weight(1f))
+                else FilledTonalButton(onClick = { showDate = true }, modifier = Modifier.weight(1f)
                     .semantics { contentDescription = "Выбрать день плана: ${formatDate(selected)}" }) {
                     Text(when (selected) { today -> "Сегодня · ${formatDate(selected)}"; today.plus(DatePeriod(days = 1)) -> "Завтра · ${formatDate(selected)}"; else -> formatDate(selected) })
                 }
@@ -93,7 +94,8 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                 if (!allDates && selected != today) TextButton(onClick = { selectedIso = null }) { Text("Сегодня") }
             }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (isIos) LifetySegmentedControl(TaskFilter.entries.map { it.title }, filter.ordinal, { filterName = TaskFilter.entries[it].name }, Modifier.fillMaxWidth())
+            else Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TaskFilter.entries.forEach { item -> FilterChip(selected = filter == item, onClick = { filterName = item.name }, label = { Text(item.title) }) }
             }
             if (!allDates) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

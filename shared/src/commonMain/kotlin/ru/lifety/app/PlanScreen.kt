@@ -11,10 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,12 +31,8 @@ fun PlanScreen(initialCalendar: Boolean = false, modifier: Modifier = Modifier) 
     var tab by rememberSaveable { mutableStateOf(if (initialCalendar) 1 else 0) }
     val stateHolder = rememberSaveableStateHolder()
     Column(modifier.fillMaxSize()) {
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            listOf("День", "Календарь", "Люди").forEachIndexed { index, title ->
-                SegmentedButton(selected = tab == index, onClick = { tab = index },
-                    shape = SegmentedButtonDefaults.itemShape(index, 3), label = { Text(title) })
-            }
-        }
+        ru.lifety.core.ui.LifetySegmentedControl(listOf("День", "Календарь", "Люди"), tab, { tab = it },
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
         AnimatedContent(tab, modifier = Modifier.weight(1f), label = "planTab",
             transitionSpec = { fadeIn(tween(LifetyMotion.Standard)) togetherWith fadeOut(tween(LifetyMotion.Quick)) }) { selectedTab ->
             stateHolder.SaveableStateProvider(listOf("tasks", "calendar", "people")[selectedTab]) {
