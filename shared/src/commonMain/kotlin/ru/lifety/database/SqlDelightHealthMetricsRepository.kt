@@ -85,6 +85,12 @@ class SqlDelightNavigationPreferencesRepository(database: LifetyDatabase, privat
     override fun observe(): Flow<List<String>> = q.selectNavigationPreference().asFlow().mapToOneOrNull(dispatcher).map { raw ->
         raw?.let { runCatching { normalizedNavigation(Json.decodeFromString<List<String>>(it)) }.getOrNull() } ?: defaultNavigation
     }
+    override fun observePresentation(): Flow<String> = q.selectNavigationPresentation().asFlow().mapToOneOrNull(dispatcher).map { if (it == "arc") "arc" else "tabs" }
+    override suspend fun saveConfiguration(routes: List<String>, presentation: String) = withContext(dispatcher) {
+        require(presentation in listOf("tabs", "arc"))
+        require(routes.size in 1..5 && routes.distinct().size == routes.size && routes.all { it in availableNavigation })
+        q.upsertNavigationConfiguration(Json.encodeToString(routes), presentation); Unit
+    }
     override suspend fun save(routes: List<String>) = withContext(dispatcher) {
         require(routes.size in 1..5 && routes.distinct().size == routes.size && routes.all { it in availableNavigation })
         q.upsertNavigationPreference(Json.encodeToString(routes)); Unit

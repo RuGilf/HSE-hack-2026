@@ -53,7 +53,7 @@ class FinanceController(private val repository: ExpenseRepository, private val s
 
     private fun validate(expense: Expense): Boolean {
         if (expense.id.isBlank() || expense.amountMinor <= 0 || expense.merchant.isBlank() ||
-            expense.merchant.length > 120 || expense.category.isBlank() || expense.category.length > 80 ||
+            expense.merchant.length > 120 || expense.note.length > 2000 || expense.category.isBlank() || expense.category.length > 80 ||
             !Regex("[A-Z]{3}").matches(expense.currency)) {
             mutableState.update { it.copy(error = "Проверьте магазин, сумму, валюту и категорию.") }
             return false

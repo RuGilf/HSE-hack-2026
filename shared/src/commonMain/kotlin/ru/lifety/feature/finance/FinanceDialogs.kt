@@ -1,5 +1,7 @@
 package ru.lifety.feature.finance
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -31,6 +33,7 @@ internal fun ExpenseEditorDialog(
 ) {
     val scope = rememberCoroutineScope()
     val id = rememberSaveable { initial?.id ?: "manual:${financeNow()}:${kotlin.random.Random.nextLong()}" }
+    var note by rememberSaveable { mutableStateOf(initial?.note.orEmpty()) }
     var merchant by rememberSaveable { mutableStateOf(initial?.merchant ?: "") }
     var amount by rememberSaveable { mutableStateOf(initial?.let { minorAmountInput(it.amountMinor) } ?: "") }
     var currency by rememberSaveable { mutableStateOf(initial?.currency ?: "RUB") }
@@ -64,7 +67,7 @@ internal fun ExpenseEditorDialog(
                 }
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(amount, { amount = it.take(40) }, label = { Text("Сумма") },
+                LifetyTextField(amount, { amount = it.take(40) }, label = { Text("Сумма") },
                     textStyle = MaterialTheme.typography.headlineLarge,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
@@ -76,9 +79,12 @@ internal fun ExpenseEditorDialog(
                             onClick = { currency = code }, label = { Text(code) })
                     }
                 }
-                OutlinedTextField(merchant, { merchant = it.take(120) }, label = { Text("Магазин") },
+                LifetyTextField(merchant, { merchant = it.take(120) }, label = { Text("Магазин") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     isError = attempted && merchant.isBlank(), enabled = !locked)
+                LifetyTextField(note, { note = it.take(2000) }, label = { Text("Что купили · необязательно") },
+                    placeholder = { Text("Например: продукты на неделю, подарок, билеты") },
+                    modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 5, enabled = !locked)
                 Text("Категория", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val suggestedCategory = inferFinanceCategory(merchant)
                 if (category == "other" && suggestedCategory != "other" && categories.any { it.id == suggestedCategory && !it.archived }) {
@@ -107,7 +113,7 @@ internal fun ExpenseEditorDialog(
                             val timestamp = if (initial != null && localFinanceDate(initial.timestamp) == parsedDate)
                                 initial.timestamp else financeDayStart(requireNotNull(parsedDate))
                             if (onSave(Expense(id, requireNotNull(minor), currency, merchant.trim(), category,
-                                    timestamp, initial?.source ?: "manual"))) {
+                                    timestamp, initial?.source ?: "manual", note.trim()))) {
                                 closing = true
                                 sheet.hide()
                                 onDismiss()
@@ -128,7 +134,7 @@ internal fun BudgetDialog(currency: String, initial: Long?, onDismiss: () -> Uni
         title = { Text("Месячный лимит · $currency") },
         text = { Column {
             Text("Для текущего календарного месяца. Хранится в сессии экрана.")
-            OutlinedTextField(input, { input = it.take(40) }, label = { Text("Сумма бюджета") },
+            LifetyTextField(input, { input = it.take(40) }, label = { Text("Сумма бюджета") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true,
                 isError = attempted && parseMinorAmount(input) == null)
             TextButton(onClick = { onSave(null) }) { Text("Убрать бюджет") }

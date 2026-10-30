@@ -39,7 +39,8 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
     var navigation by remember { mutableStateOf(false) }
     val lockState = LocalSectionLockState.current
     LaunchedEffect(controller) { controller.refreshIcon() }
-    LifetyBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, contentColor = MaterialTheme.colorScheme.onSurface) {
+    LifetyBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, contentColor = MaterialTheme.colorScheme.onSurface,
+        containerColor = if (isIos) MaterialTheme.colorScheme.background else BottomSheetDefaults.ContainerColor) {
         if (security) SectionLockSettingsContent(onBack = { security = false }) else if (navigation) NavigationSettingsContent(onBack = { navigation = false }) else {
         Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.CenterHorizontally)
             .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
@@ -51,6 +52,13 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
                 }
                 IconButton(onClick = { scope.launch { sheet.hide(); onDismiss() } }, modifier = Modifier.semantics { contentDescription = "Закрыть настройки" }) { LifetyIcon(LifetySymbol.Close) }
             }
+            if (isIos) Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Column {
+                    SettingsLink("Код-пароль на разделы", if (lockState.configuration.enabled) "Защищено разделов: ${lockState.configuration.sections.size}" else "Выберите, какие разделы защищать") { security = true }
+                    HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
+                    SettingsLink("Нижняя панель", "Разделы и их порядок") { navigation = true }
+                }
+            } else {
             OutlinedCard(onClick = { security = true }, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Код-пароль на разделы", style = MaterialTheme.typography.titleMedium)
@@ -63,6 +71,7 @@ fun LifetySettingsSheet(onDismiss: () -> Unit, onFinance: () -> Unit) {
                     Text("Нижняя панель", style = MaterialTheme.typography.titleMedium)
                     Text("Пункты и порядок в овале", style = MaterialTheme.typography.bodySmall)
                 }
+            }
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Тема", style = MaterialTheme.typography.titleMedium)
@@ -115,7 +124,7 @@ private fun ThemeTile(theme: LifetyPalette, selected: Boolean, enabled: Boolean,
     val p = theme.palette
     Surface(modifier.selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
         shape = RoundedCornerShape(18.dp), color = p.surface, contentColor = p.text,
-        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) p.accent else p.outline.copy(alpha = .5f))) {
+        border = if (selected) BorderStroke(2.dp, p.accent) else if (isIos) null else BorderStroke(1.dp, p.outline.copy(alpha = .5f))) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppIconPreview(theme, Modifier.size(36.dp))
@@ -148,5 +157,18 @@ private fun AppIconPreview(theme: LifetyPalette, modifier: Modifier = Modifier) 
             cubicTo(center.x - unit * 8f / 108f, center.y + unit * 15f / 108f, center.x + unit * 8f / 108f, center.y + unit * 15f / 108f, center.x + unit * 12f / 108f, center.y + unit * 3f / 108f)
         }
         drawPath(smile, p.accent, style = Stroke(unit * 4f / 108f, cap = StrokeCap.Round))
+    }
+}
+
+@Composable
+private fun SettingsLink(title: String, detail: String, onClick: () -> Unit) {
+    Surface(onClick = onClick, color = MaterialTheme.colorScheme.surfaceContainerLow, contentColor = MaterialTheme.colorScheme.onSurface) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            LifetyIcon(LifetySymbol.Chevron, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

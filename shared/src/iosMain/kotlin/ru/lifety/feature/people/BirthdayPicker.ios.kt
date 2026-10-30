@@ -18,6 +18,7 @@ import platform.darwin.NSObject
 import platform.UIKit.*
 import ru.lifety.core.time.russianMonths
 import ru.lifety.core.time.today
+import ru.lifety.core.appearance.toUiColor
 
 /** Native wheel picker, including an absent year as in the iOS Contacts birthday editor. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,6 +26,7 @@ import ru.lifety.core.time.today
 internal actual fun BirthdayPickerDialog(initial: BirthdaySelection?, onConfirm: (BirthdaySelection) -> Unit, onDismiss: () -> Unit) {
     val currentDay = today()
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val nativeBackground = MaterialTheme.colorScheme.surfaceContainerHigh
     var day by rememberSaveable { mutableStateOf(initial?.day ?: currentDay.day) }
     var month by rememberSaveable { mutableStateOf(initial?.month ?: currentDay.month.number) }
     var year by rememberSaveable { mutableStateOf(initial?.year) }
@@ -74,8 +76,9 @@ internal actual fun BirthdayPickerDialog(initial: BirthdaySelection?, onConfirm:
                         backgroundColor = UIColor.clearColor
                     }
                 }, modifier = Modifier.fillMaxWidth().height(216.dp),
-                    properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.NonCooperative, isNativeAccessibilityEnabled = true, placedAsOverlay = true),
+                    properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.Cooperative(), isNativeAccessibilityEnabled = true),
                     update = { picker ->
+                        picker.backgroundColor = nativeBackground.toUiColor()
                         picker.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
                         picker.reloadComponent(0)
                         val rows = listOf((day - 1).toLong(), (month - 1).toLong(), year?.let { (currentDay.year - it + 1).toLong() } ?: 0L)

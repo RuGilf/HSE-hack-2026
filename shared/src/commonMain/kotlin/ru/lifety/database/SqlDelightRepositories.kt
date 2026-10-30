@@ -65,7 +65,7 @@ class SqlDelightExpenseRepository(
 
     override suspend fun upsert(expense: Expense) = withContext(dispatcher) {
         queries.upsertExpense(expense.id, expense.amountMinor, expense.currency, expense.merchant,
-            expense.category, expense.timestamp, expense.source)
+            expense.category, expense.timestamp, expense.source, expense.note)
         Unit
     }
 

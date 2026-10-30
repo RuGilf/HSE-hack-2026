@@ -118,7 +118,7 @@ private fun LifetyContent(repositories: Repositories?) {
             val section = AppDestination.fromRoute(route.orEmpty())
             val selectedNavigation = if (section in listOf(AppDestination.CALENDAR, AppDestination.PEOPLE) && section !in navigationItems && AppDestination.TASKS in navigationItems) AppDestination.TASKS else section
             val showNavigation = !isEditor && !keyboardVisible
-            val bottomInset = if (isIos && showNavigation) 49.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() else 0.dp
+            val bottomInset = if (isIos && showNavigation) (if (LocalNavigationState.current.presentation == "arc") 72.dp else 49.dp) + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() else 0.dp
             val selectSection: (AppDestination) -> Unit = { item ->
                 val target = if (item == AppDestination.TASKS && AppDestination.CALENDAR !in navigationItems) AppDestination.fromRoute(planRoute) else item
                 if (section != item) navigator.navigate(target)

@@ -1,5 +1,7 @@
 package ru.lifety.feature.assistant
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -121,7 +123,7 @@ private fun ApiAssistantScreen(modifier: Modifier, onManual: () -> Unit) {
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
         (state.error ?: state.view.error)?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(input, { input = it.take(8000) }, Modifier.weight(1f), enabled = state.connected,
+            LifetyTextField(input, { input = it.take(8000) }, Modifier.weight(1f), enabled = state.connected,
                 placeholder = { Text("Спросите что-нибудь…") }, maxLines = 5, shape = RoundedCornerShape(24.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if (!state.busy && input.isNotBlank()) send() }))
             if (state.busy) FilledTonalButton(onClick = controller::cancel, modifier = Modifier.heightIn(min = 56.dp)) { Text("Стоп") }

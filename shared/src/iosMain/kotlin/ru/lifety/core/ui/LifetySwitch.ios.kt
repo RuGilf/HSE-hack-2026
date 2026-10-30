@@ -4,8 +4,9 @@ package ru.lifety.core.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.*
 import kotlinx.cinterop.ObjCAction
@@ -14,24 +15,40 @@ import platform.CoreGraphics.CGRectMake
 import platform.Foundation.NSSelectorFromString
 import platform.UIKit.*
 import ru.lifety.core.appearance.toUiColor
-import androidx.compose.ui.unit.DpSize
 
 @Composable
 internal actual fun LifetySwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier, enabled: Boolean) {
     val change by rememberUpdatedState(onCheckedChange)
     val accent = MaterialTheme.colorScheme.primary.toUiColor()
-    // iOS 26 changed UISwitch dimensions. Never crop it to the old 51 × 31 size.
-    val size = remember { UISwitch().intrinsicContentSize.useContents { DpSize(width.toFloat().dp, height.toFloat().dp) } }
-    Box(modifier.sizeIn(minWidth = size.width, minHeight = maxOf(44.dp, size.height)), contentAlignment = Alignment.Center) {
-        UIKitView(factory = {
-            object : UISwitch(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
-                @ObjCAction fun valueChanged() { change(on) }
-            }.apply { addTarget(this, NSSelectorFromString("valueChanged"), UIControlEventValueChanged) }
-        }, modifier = Modifier.size(size),
-            properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.Cooperative(),
-                isNativeAccessibilityEnabled = true),
-            update = { control -> control.enabled = enabled; control.onTintColor = accent; if (control.on != checked) control.setOn(checked, animated = false) },
-            onRelease = { it.removeTarget(it, NSSelectorFromString("valueChanged"), UIControlEventValueChanged) })
-    }
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val surface = LocalNativeSurfaceColor.current.takeOrElse { MaterialTheme.colorScheme.background }.toUiColor()
+    // UISwitch's final style/size is resolved after it joins the native window.
+    // A padded UIView hosts its natural size; the Metal cut-out never crops its rounded edge.
+    UIKitView(factory = {
+        val control = object : UISwitch(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
+            @ObjCAction fun valueChanged() { change(on) }
+        }.apply { addTarget(this, NSSelectorFromString("valueChanged"), UIControlEventValueChanged) }
+        object : UIView(frame = CGRectMake(0.0, 0.0, 80.0, 44.0)) {
+            init { addSubview(control) }
+            override fun layoutSubviews() {
+                super.layoutSubviews()
+                control.sizeToFit()
+                val size = control.bounds.useContents { size.width to size.height }
+                bounds.useContents {
+                    control.setFrame(CGRectMake((this.size.width - size.first) / 2, (this.size.height - size.second) / 2, size.first, size.second))
+                }
+            }
+        }
+    }, modifier = modifier.size(80.dp, 44.dp),
+        properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.Cooperative(), isNativeAccessibilityEnabled = true),
+        update = { host ->
+            host.backgroundColor = surface
+            host.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
+            val control = host.subviews.first() as UISwitch
+            control.enabled = enabled
+            control.onTintColor = accent
+            if (control.on != checked) control.setOn(checked, animated = false)
+            host.setNeedsLayout()
+        }, onRelease = { host -> (host.subviews.first() as UISwitch).let { it.removeTarget(it, NSSelectorFromString("valueChanged"), UIControlEventValueChanged) } })
 }

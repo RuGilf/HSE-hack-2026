@@ -12,6 +12,7 @@ import ru.lifety.database.SqlDelightExpenseCategoryRepository
 import ru.lifety.database.SqlDelightPersonRepository
 import ru.lifety.database.SqlDelightGoalRepository
 import ru.lifety.database.SqlDelightPlanningRepository
+import ru.lifety.database.SqlDelightScheduleRepository
 import ru.lifety.database.SqlDelightChatGptExchangeRepository
 import ru.lifety.database.createDatabase
 import ru.lifety.database.SqlDelightHealthMetricsRepository
@@ -35,6 +36,7 @@ class AppContainer(
         chatGptExchange = SqlDelightChatGptExchangeRepository(database, dispatcher),
         healthMetrics = SqlDelightHealthMetricsRepository(database, dispatcher),
         navigation = SqlDelightNavigationPreferencesRepository(database, dispatcher),
+        schedule = SqlDelightScheduleRepository(database, dispatcher),
     )
 
     override fun close() { driver.close() }

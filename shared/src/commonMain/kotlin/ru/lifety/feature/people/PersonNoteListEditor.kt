@@ -1,5 +1,7 @@
 package ru.lifety.feature.people
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,7 +35,7 @@ internal fun PersonNoteListEditor(title: String, itemLabel: String, addLabel: St
         Text(title, style = MaterialTheme.typography.titleMedium)
         items.forEachIndexed { index, value ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                OutlinedTextField(value, { onChange(replacePersonNoteItem(items, index, it.take(10_000))) },
+                LifetyTextField(value, { onChange(replacePersonNoteItem(items, index, it.take(10_000))) },
                     label = { Text("$itemLabel ${index + 1}") }, placeholder = { Text(hint) },
                     modifier = Modifier.weight(1f).then(if (index == items.lastIndex) Modifier.focusRequester(lastItemFocus) else Modifier),
                     enabled = enabled, singleLine = true,

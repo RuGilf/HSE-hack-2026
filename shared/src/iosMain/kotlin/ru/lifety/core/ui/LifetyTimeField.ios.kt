@@ -20,7 +20,7 @@ internal actual fun LifetyTimeField(label: String, hour: Int, minute: Int,
     val initial = LocalDateTime(date, LocalTime(hour, minute)).toInstant(TimeZone.UTC).toEpochMilliseconds()
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        IosDatePicker(initial, UIDatePickerMode.UIDatePickerModeTime, label, Modifier.width(110.dp), enabled = enabled, useUtc = true, backgroundColor = MaterialTheme.colorScheme.background) {
+        IosDatePicker(initial, UIDatePickerMode.UIDatePickerModeTime, label, Modifier.width(110.dp), enabled = enabled, useUtc = true, backgroundColor = LocalNativeSurfaceColor.current) {
             val time = Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.UTC)
             onChange(time.hour, time.minute)
         }

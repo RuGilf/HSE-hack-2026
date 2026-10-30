@@ -86,6 +86,10 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
     var selectedIso by rememberSaveable { mutableStateOf(currentDay.toString()) }
     var monthIso by rememberSaveable { mutableStateOf(LocalDate(currentDay.year, currentDay.month.number, 1).toString()) }
     val selected = LocalDate.parse(selectedIso)
+    val planningState = ru.lifety.core.ui.LocalPlanningState.current
+    val scheduleRepository = LocalRepositories.current?.schedule
+    var editingScheduleId by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedSchedule = remember(planningState.schedule, selected, zone) { ru.lifety.core.planner.scheduleOnDate(planningState.schedule, selected, zone) }
     val month = LocalDate.parse(monthIso)
     val dates = remember(month) {
         val grid = monthGrid(month)
@@ -99,6 +103,7 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
         dates.associateWith { birthdaysOnDate(peopleState.people, it).size }
     }
     val selectedBirthdays = remember(peopleState.people, selected) { birthdaysOnDate(peopleState.people, selected) }
+    val scheduleCounts = remember(planningState.schedule, dates, zone) { dates.associateWith { ru.lifety.core.planner.scheduleOnDate(planningState.schedule, it, zone).size } }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.actionError) { state.actionError?.let { snackbar.showSnackbar(it); model.dismissError() } }
     Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0), snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = bottomInset)) },
@@ -124,20 +129,25 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                                 week.forEach { day ->
                                     val chosen = day == selected
                                     Surface(onClick = { selectedIso = day.toString(); monthIso = LocalDate(day.year, day.month.number, 1).toString() },
-                                        modifier = Modifier.weight(1f).height(48.dp).semantics { this.selected = chosen; contentDescription = "${formatDate(day)}, задач: ${taskCounts[day] ?: 0}, дней рождения: ${birthdayCounts[day] ?: 0}" },
+                                        modifier = Modifier.weight(1f).height(48.dp).semantics { this.selected = chosen; contentDescription = "${formatDate(day)}, задач: ${taskCounts[day] ?: 0}, занятий: ${scheduleCounts[day] ?: 0}, дней рождения: ${birthdayCounts[day] ?: 0}" },
                                         shape = RoundedCornerShape(12.dp),
                                         color = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerLow,
                                         border = if (day == currentDay && !chosen) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                             Text(day.day.toString(), style = MaterialTheme.typography.bodyMedium,
                                                 color = if (chosen) MaterialTheme.colorScheme.onPrimary else if (day.month.number == month.month.number) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
-                                            Text(when { (birthdayCounts[day] ?: 0) > 0 && (taskCounts[day] ?: 0) > 0 -> "• ♥"; (birthdayCounts[day] ?: 0) > 0 -> "♥"; (taskCounts[day] ?: 0) > 0 -> "•"; else -> " " }, style = MaterialTheme.typography.labelSmall, color = if (chosen) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary)
+                                            Text(buildString {
+                                                if ((taskCounts[day] ?: 0) > 0) append("•")
+                                                if ((scheduleCounts[day] ?: 0) > 0) append(" ◦")
+                                                if ((birthdayCounts[day] ?: 0) > 0) append(" ♥")
+                                                if (isEmpty()) append(" ")
+                                            }, style = MaterialTheme.typography.labelSmall, color = if (chosen) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary)
                                         }
                                     }
                                 }
                             }
                         }
-                        Text("• План и дедлайны    ♥ Дни рождения", style = MaterialTheme.typography.labelSmall,
+                        Text("• Дела    ◦ Расписание    ♥ Дни рождения", style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
@@ -150,6 +160,19 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                 Text("План и дедлайны · ${selectedTasks.size} задач", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (peopleState.loading) item { Text("Загружаем дни рождения…", style = MaterialTheme.typography.bodySmall) }
+            if (planningState.loading) item { Text("Загружаем расписание…", style = MaterialTheme.typography.bodySmall) }
+            planningState.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+            if (selectedSchedule.isNotEmpty()) item { Text("Расписание", style = MaterialTheme.typography.titleMedium) }
+            items(selectedSchedule, key = { "schedule:${it.block.id}:${it.start}" }) { occurrence ->
+                Card(onClick = { editingScheduleId = occurrence.block.id }, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(occurrence.block.title, style = MaterialTheme.typography.titleMedium)
+                        Text("${ru.lifety.core.planner.formatPlannerTime(occurrence.start, zone)} — ${ru.lifety.core.planner.formatPlannerTime(occurrence.end, zone)}", color = MaterialTheme.colorScheme.primary)
+                        if (localDate(occurrence.start, zone) != selected || localDate(occurrence.end, zone) != selected)
+                            Text("${formatDate(localDate(occurrence.start, zone))} — ${formatDate(localDate(occurrence.end, zone))}", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             peopleState.error?.let { error -> item {
                 Text(error, color = MaterialTheme.colorScheme.error)
                 TextButton(onClick = { peopleModel?.retry() }) { Text("Повторить") }
@@ -174,7 +197,7 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                     Text(requireNotNull(state.readError), color = MaterialTheme.colorScheme.error)
                     Button(onClick = model::retry) { Text("Повторить") }
                 }
-                selectedTasks.isEmpty() && selectedBirthdays.isEmpty() && !peopleState.loading && peopleState.error == null -> item { LifetyEmptyState("Свободный день", "Оставь время для себя или добавь новый план.", emotion = LifetyEmotion.Calm, mascotSize = 72.dp) }
+                selectedTasks.isEmpty() && selectedBirthdays.isEmpty() && selectedSchedule.isEmpty() && !planningState.loading && planningState.error == null && !peopleState.loading && peopleState.error == null -> item { LifetyEmptyState("Свободный день", "Оставь время для себя или добавь новый план.", emotion = LifetyEmotion.Calm, mascotSize = 72.dp) }
                 else -> items(selectedTasks, key = { "task:${it.id}" }, contentType = { "task" }) { task ->
                     androidx.compose.foundation.layout.Box(Modifier.animateItem(fadeInSpec = tween(LifetyMotion.Quick), placementSpec = tween(LifetyMotion.Standard), fadeOutSpec = tween(LifetyMotion.Quick))) {
                     TaskCard(task, task.id in state.busyIds, onOpen = { planner?.openTask(task.id) }, onToggle = { model.toggle(task) }, now = now)
@@ -187,6 +210,12 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
         val initial = remember(id, peopleState.loading) { peopleState.people.find { it.id == id } }
         if (initial != null && peopleRepository != null) key(id) {
             PersonEditorSheet(initial, false, peopleRepository, onDismiss = { editingPersonId = null })
+        }
+    }
+    editingScheduleId?.let { id ->
+        val initial = planningState.schedule.find { it.id == id }
+        if (initial != null && scheduleRepository != null) key(id) {
+            ru.lifety.feature.schedule.ScheduleEditorSheet(initial, false, scheduleRepository) { editingScheduleId = null }
         }
     }
 

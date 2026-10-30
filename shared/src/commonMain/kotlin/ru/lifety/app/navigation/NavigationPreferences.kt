@@ -18,18 +18,23 @@ internal val AppDestination.symbol: LifetySymbol get() = when (this) {
     AppDestination.PEOPLE -> LifetySymbol.People
     AppDestination.ASSISTANT -> LifetySymbol.Assistant
 }
-internal data class NavigationState(val routes: List<String> = defaultNavigation, val saving: Boolean = false, val error: String? = null)
+internal data class NavigationState(val routes: List<String> = defaultNavigation, val saving: Boolean = false, val error: String? = null, val presentation: String = "tabs")
 internal class NavigationController(private val repository: NavigationPreferencesRepository?, private val scope: CoroutineScope) {
     private val mutable = MutableStateFlow(NavigationState())
     val state = mutable.asStateFlow()
     init { scope.launch { try { repository?.observe()?.collect { mutable.update { s -> s.copy(routes = normalizedNavigation(it)) } } }
         catch (c: CancellationException) { throw c }
         catch (_: Exception) { mutable.update { it.copy(error = "Не удалось загрузить панель") } } } }
-    fun save(routes: List<String>, onSaved: () -> Unit) {
+    init { scope.launch {
+        try { repository?.observePresentation()?.collect { mode -> mutable.update { it.copy(presentation = if (mode == "arc") "arc" else "tabs") } } }
+        catch (c: CancellationException) { throw c }
+        catch (_: Exception) { mutable.update { it.copy(error = "Не удалось загрузить вид навигации") } }
+    } }
+    fun save(routes: List<String>, presentation: String, onSaved: () -> Unit) {
         if (state.value.saving) return
         mutable.update { it.copy(saving = true, error = null) }
         scope.launch {
-            try { requireNotNull(repository).save(routes); onSaved() }
+            try { requireNotNull(repository).saveConfiguration(routes, presentation); onSaved() }
             catch (c: CancellationException) { throw c }
             catch (_: Exception) { mutable.update { it.copy(error = "Не удалось сохранить панель") } }
             finally { mutable.update { it.copy(saving = false) } }

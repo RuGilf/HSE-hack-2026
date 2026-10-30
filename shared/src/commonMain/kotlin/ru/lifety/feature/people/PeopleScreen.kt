@@ -1,5 +1,7 @@
 package ru.lifety.feature.people
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -47,7 +49,7 @@ fun PeopleScreen(modifier: Modifier = Modifier) {
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 100.dp + bottomInset), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
-                OutlinedTextField(search, { search = it }, label = { Text("Поиск людей и заметок") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                LifetyTextField(search, { search = it }, label = { Text("Поиск людей и заметок") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
             when {
                 state.loading -> item { LinearProgressIndicator(Modifier.fillMaxWidth()) }

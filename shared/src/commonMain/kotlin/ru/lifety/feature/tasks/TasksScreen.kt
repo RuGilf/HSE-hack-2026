@@ -55,10 +55,11 @@ fun TasksScreen(modifier: Modifier = Modifier) {
     val planningState = LocalPlanningState.current
     val retryPlanning = LocalPlanningRetry.current
     val details = planningState.plans
-    val timeline = remember(state.tasks, details, selected, zone, filter, fromHour, untilHour) {
-        dayTimeline(visibleTasks(state.tasks, filter), details, selected, zone, fromHour, untilHour)
+    val timeline = remember(state.tasks, details, planningState.schedule, selected, zone, filter, fromHour, untilHour) {
+        dayTimeline(visibleTasks(state.tasks, filter), details, selected, zone, fromHour, untilHour, planningState.schedule)
     }
     var pendingDelete by remember { mutableStateOf<Task?>(null) }
+    var editingScheduleId by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.actionError) { state.actionError?.let { snackbar.showSnackbar(it); model.dismissError() } }
     val scope = rememberCoroutineScope()
@@ -127,7 +128,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                     }.map { (title, rows) -> title to rows.filter { it.id !in timedIds } }.filter { it.second.isNotEmpty() }
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 100.dp + bottomInset)) {
                         if (!allDates && timelineMode) dayTimelineItems(timeline, selected, zone, now, filter != TaskFilter.COMPLETED, state.busyIds,
-                            { planner?.openTask(it.id) }, model::toggle, { planner?.createTask(it) })
+                            { planner?.openTask(it.id) }, model::toggle, { planner?.createTask(it) }, { editingScheduleId = it })
                         if (sections.all { it.second.isEmpty() } && (allDates || !timelineMode || timeline.tasks.isEmpty() && filter == TaskFilter.COMPLETED)) item {
                             LifetyEmptyState(title = if (filter == TaskFilter.COMPLETED) "Пока нет завершённых дел" else "День свободен",
                                 message = if (filter == TaskFilter.COMPLETED) "Здесь будут завершённые дела выбранного периода. Все записи доступны через «Все даты»."
@@ -141,6 +142,13 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                     }
                 }
             }
+        }
+    }
+    editingScheduleId?.let { id ->
+        val block = planningState.schedule.find { it.id == id }
+        val scheduleRepository = LocalRepositories.current?.schedule
+        if (block != null && scheduleRepository != null) key(id) {
+            ru.lifety.feature.schedule.ScheduleEditorSheet(block, false, scheduleRepository) { editingScheduleId = null }
         }
     }
     if (hoursDialog) TimelineHoursDialog(fromHour, untilHour, onSave = { from, until -> fromHour = from; untilHour = until; hoursDialog = false }, onDismiss = { hoursDialog = false })

@@ -1,5 +1,7 @@
 package ru.lifety.feature.assistant
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -35,10 +37,10 @@ import kotlinx.coroutines.flow.catch
             Text("Обмен планом работает без API-ключа.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             HorizontalDivider()
             Text("Подключение", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(base, { base = it }, Modifier.fillMaxWidth(), label = { Text("Адрес API, включая /v1") }, singleLine = true, enabled = !state.busy,
+            LifetyTextField(base, { base = it }, Modifier.fillMaxWidth(), label = { Text("Адрес API, включая /v1") }, singleLine = true, enabled = !state.busy,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
-            OutlinedTextField(model, { model = it }, Modifier.fillMaxWidth(), label = { Text("Модель") }, singleLine = true, enabled = !state.busy)
-            OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth(), label = { Text("API-ключ") }, singleLine = true, enabled = !state.busy,
+            LifetyTextField(model, { model = it }, Modifier.fillMaxWidth(), label = { Text("Модель") }, singleLine = true, enabled = !state.busy)
+            LifetyTextField(key, { key = it }, Modifier.fillMaxWidth(), label = { Text("API-ключ") }, singleLine = true, enabled = !state.busy,
                 visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
             Text(controller.credentialStorageDescription, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick = { controller.connect(entered) }, enabled = !state.busy && !configured && base.isNotBlank() && model.isNotBlank() && key.isNotBlank(),
@@ -79,5 +81,5 @@ import kotlinx.coroutines.flow.catch
 }
 
 @Composable private fun ScopeToggle(label: String, checked: Boolean, enabled: Boolean, change: (Boolean) -> Unit) {
-    ListItem(headlineContent = { Text(label) }, trailingContent = { ru.lifety.core.ui.LifetySwitch(checked, change, enabled = enabled) }, colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface))
+    ListItem(headlineContent = { Text(label) }, trailingContent = { CompositionLocalProvider(ru.lifety.core.ui.LocalNativeSurfaceColor provides MaterialTheme.colorScheme.surface) { ru.lifety.core.ui.LifetySwitch(checked, change, enabled = enabled) } }, colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface))
 }

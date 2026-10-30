@@ -82,8 +82,8 @@ fun FinanceContent(
     var toText by rememberSaveable { mutableStateOf(today.firstDayOfNextMonth().previousDay().toString()) }
     var allTime by rememberSaveable { mutableStateOf(false) }
     var editing by rememberSaveable(stateSaver = listSaver<Expense?, Any>(
-        save = { expense -> expense?.let { listOf(it.id, it.amountMinor, it.currency, it.merchant, it.category, it.timestamp, it.source) }.orEmpty() },
-        restore = { values -> if (values.isEmpty()) null else Expense(values[0] as String, values[1] as Long, values[2] as String, values[3] as String, values[4] as String, values[5] as Long, values[6] as String) },
+        save = { expense -> expense?.let { listOf(it.id, it.amountMinor, it.currency, it.merchant, it.category, it.timestamp, it.source, it.note) }.orEmpty() },
+        restore = { values -> if (values.isEmpty()) null else Expense(values[0] as String, values[1] as Long, values[2] as String, values[3] as String, values[4] as String, values[5] as Long, values[6] as String, values.getOrNull(7) as? String ?: "") },
     )) { mutableStateOf<Expense?>(null) }
     var suggestionId by rememberSaveable { mutableStateOf<String?>(null) }
     var showEditor by rememberSaveable { mutableStateOf(false) }
@@ -330,11 +330,14 @@ private fun ExpenseRow(expense: Expense, enabled: Boolean, onEdit: () -> Unit, o
         headlineContent = { Text(expense.merchant, maxLines = 2) },
         leadingContent = { CategoryMarker(expense.category) },
         supportingContent = {
+            Column {
+            if (expense.note.isNotBlank()) Text(expense.note, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Text(categoryDisplayName(expense.category) + when {
                 expense.source == "demo-notification" -> " · ДЕМО"
                 expense.source.startsWith("notification:") -> " · Из уведомления"
                 else -> ""
             })
+            }
         },
         trailingContent = {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {

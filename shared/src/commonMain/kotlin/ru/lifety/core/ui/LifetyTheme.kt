@@ -93,7 +93,9 @@ fun LifetyTheme(content: @Composable () -> Unit) {
     val colors = remember(state.theme) { state.theme.colorScheme() }
     ApplyPlatformAppearance(state.theme.palette)
     CompositionLocalProvider(LocalAppearance provides appearance) {
-        MaterialTheme(colorScheme = colors, shapes = if (isIos) iosShapes else shapes,
-            typography = if (isIos) iosTypography else typography, content = content)
+        CompositionLocalProvider(LocalNativeSurfaceColor provides colors.background) {
+            MaterialTheme(colorScheme = colors, shapes = if (isIos) iosShapes else shapes,
+                typography = if (isIos) iosTypography else typography, content = content)
+        }
     }
 }

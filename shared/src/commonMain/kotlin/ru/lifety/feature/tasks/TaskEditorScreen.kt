@@ -1,7 +1,11 @@
 package ru.lifety.feature.tasks
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.height
@@ -25,7 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -120,7 +123,12 @@ fun TaskEditorScreen(taskId: String?, initialScheduledAt: Long?, onClose: () -> 
                         }
                         else -> {
                             val task = requireNotNull(state.task)
-                            OutlinedTextField(value = task.title, onValueChange = model::setTitle, enabled = !state.saving,
+                            // IME selection/composition must update synchronously, without waiting
+                            // for the StateFlow echo of each key (which can reset the iOS caret).
+                            var titleEdit by rememberSaveable(task.id, stateSaver = TextFieldValue.Saver) {
+                                mutableStateOf(TextFieldValue(task.title, TextRange(task.title.length)))
+                            }
+                            LifetyTextField(value = titleEdit, onValueChange = { titleEdit = it; model.setTitle(it.text) }, enabled = !state.saving,
                                 label = { Text("Название задачи") }, modifier = Modifier.fillMaxWidth(), minLines = 1, maxLines = 4,
                                 isError = task.title.isBlank() && state.error != null,
                                 supportingText = if (task.title.isBlank() && state.error != null) ({ Text("Добавьте название задачи") }) else null)

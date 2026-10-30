@@ -18,4 +18,9 @@ interface HealthMetricsRepository {
 interface NavigationPreferencesRepository {
     fun observe(): Flow<List<String>>
     suspend fun save(routes: List<String>)
+    fun observePresentation(): Flow<String> = kotlinx.coroutines.flow.flowOf("tabs")
+    suspend fun saveConfiguration(routes: List<String>, presentation: String) {
+        require(presentation == "tabs") { "This repository does not support arc navigation" }
+        save(routes)
+    }
 }

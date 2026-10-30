@@ -34,7 +34,7 @@ class SqlDelightPlanningRepository(database: LifetyDatabase, private val dispatc
     private val queries = database.lifetyQueries
     override fun observeAll(): Flow<List<TaskPlan>> = queries.selectTaskPlans(::TaskPlan).asFlow().mapToList(dispatcher)
     override fun observeReport(): Flow<PlanReport?> = queries.selectPlanReport(::PlanReport).asFlow().mapToOneOrNull(dispatcher)
-    private fun readSnapshot() = PlanSnapshot(queries.selectTasks(::Task).executeAsList(), queries.selectGoals(::Goal).executeAsList(), queries.selectTaskPlans(::TaskPlan).executeAsList())
+    private fun readSnapshot() = PlanSnapshot(queries.selectTasks(::Task).executeAsList(), queries.selectGoals(::Goal).executeAsList(), queries.selectTaskPlans(::TaskPlan).executeAsList(), queries.selectScheduleBlocks(::scheduleBlock).executeAsList())
     override suspend fun snapshot(): PlanSnapshot = withContext(dispatcher) { queries.transactionWithResult { readSnapshot() } }
     override suspend fun saveTask(task: Task, details: TaskPlan?) = withContext(dispatcher) {
         require(task.id.isNotBlank() && task.title.isNotBlank())

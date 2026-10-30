@@ -39,5 +39,13 @@ internal fun Color.toUiColor() = UIColor(red = red.toDouble(), green = green.toD
         host.view.backgroundColor = palette.background.toUiColor()
         host.view.window?.backgroundColor = palette.background.toUiColor()
         host.view.tintColor = palette.accent.toUiColor()
+        // Compose dialogs use additional controllers. Their explicit old style must not
+        // survive a palette switch while an editor or picker is already open.
+        fun updateStyle(controller: UIViewController) {
+            controller.overrideUserInterfaceStyle = style
+            controller.childViewControllers.filterIsInstance<UIViewController>().forEach(::updateStyle)
+            controller.presentedViewController?.let(::updateStyle)
+        }
+        host.view.window?.rootViewController?.let(::updateStyle)
     }
 }

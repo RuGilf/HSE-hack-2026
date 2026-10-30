@@ -1,5 +1,7 @@
 package ru.lifety.feature.assistant.transfer
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -94,7 +96,7 @@ internal fun PlanTransferContent(modifier: Modifier = Modifier, onBusyChanged: (
                     if (workspace.preferences.includeSleep) Text("Сон: 7 дней · месяцев в сводке: ${state.sleep?.months?.size ?: 0}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     else Text("Сон не включён · можно добавить в настройках обмена", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (formOpen) {
-                        OutlinedTextField(request, { request = it.take(2000) }, Modifier.fillMaxWidth(), label = { Text(if (workspace.preferences.includeTasks) "Пожелания к этому плану" else "Вопрос для ChatGPT") }, placeholder = { Text("Например: свободен после 18:00, оставь время на отдых") }, minLines = 2, maxLines = 4, enabled = !state.busy)
+                        LifetyTextField(request, { request = it.take(2000) }, Modifier.fillMaxWidth(), label = { Text(if (workspace.preferences.includeTasks) "Пожелания к этому плану" else "Вопрос для ChatGPT") }, placeholder = { Text("Например: свободен после 18:00, оставь время на отдых") }, minLines = 2, maxLines = 4, enabled = !state.busy)
                         if (workspace.preferences.includeTasks && state.snapshot?.tasks?.none { !it.isCompleted } == true) {
                             val planner = LocalPlannerNavigation.current
                             FilledTonalButton(onClick = { planner?.createTask() }, enabled = planner != null) { Text("Добавить задачу") }
@@ -158,7 +160,7 @@ internal fun PlanTransferContent(modifier: Modifier = Modifier, onBusyChanged: (
                         TextButton(onClick = { inputVisible = !inputVisible }, enabled = !state.busy) { Text("Вставить вручную") }
                     }
                     if (inputVisible) {
-                        OutlinedTextField(text, { if (it.length <= 1_000_000) { text = it; localError = null; controller.discardPreview() } else localError = "Ответ слишком большой" }, Modifier.fillMaxWidth(), label = { Text("Итоговый ответ с планом") }, minLines = 3, maxLines = 7, enabled = !state.busy)
+                        LifetyTextField(text, { if (it.length <= 1_000_000) { text = it; localError = null; controller.discardPreview() } else localError = "Ответ слишком большой" }, Modifier.fillMaxWidth(), label = { Text("Итоговый ответ с планом") }, minLines = 3, maxLines = 7, enabled = !state.busy)
                         TextButton(onClick = { controller.preview(text) }, enabled = !state.busy && text.isNotBlank()) { Text("Проверить ответ") }
                     }
                     }

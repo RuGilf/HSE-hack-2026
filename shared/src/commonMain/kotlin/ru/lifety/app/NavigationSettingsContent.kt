@@ -17,6 +17,7 @@ import ru.lifety.core.ui.*
     val state = LocalNavigationState.current
     val controller = LocalNavigationController.current
     var routes by remember { mutableStateOf(state.routes) }
+    var presentation by remember { mutableStateOf(state.presentation) }
     Column(Modifier.fillMaxWidth().fillMaxHeight(.92f).padding(horizontal = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack, enabled = !state.saving, modifier = Modifier.semantics { contentDescription = "Вернуться в настройки" }) { LifetyIcon(LifetySymbol.Back) }
@@ -24,6 +25,13 @@ import ru.lifety.core.ui.*
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("До 5 вкладок. Остальные разделы — в меню «Все разделы».", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (isIos) {
+                Text("Вид навигации", style = MaterialTheme.typography.titleSmall)
+                LifetySegmentedControl(listOf("Панель", "Дуга"), if (presentation == "arc") 1 else 0,
+                    { presentation = if (it == 1) "arc" else "tabs" }, Modifier.fillMaxWidth(), enabled = !state.saving)
+                Text(if (presentation == "arc") "Удерживайте центральный овал — разделы появятся над ним по дуге. Нажмите раздел для перехода. Касание овала также открывает меню."
+                    else "Все выбранные разделы видны в нижней панели.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Text("В панели", style = MaterialTheme.typography.titleSmall)
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                 Column {
@@ -54,6 +62,6 @@ import ru.lifety.core.ui.*
             TextButton(onClick = { routes = defaultNavigation }, enabled = !state.saving) { Text("Восстановить стандартные") }
         }
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        Button(onClick = { controller?.save(routes, onBack) }, enabled = !state.saving && routes.isNotEmpty(), modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) { Text(if (state.saving) "Сохраняем…" else "Сохранить") }
+        Button(onClick = { controller?.save(routes, presentation, onBack) }, enabled = !state.saving && routes.isNotEmpty(), modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) { Text(if (state.saving) "Сохраняем…" else "Сохранить") }
     }
 }

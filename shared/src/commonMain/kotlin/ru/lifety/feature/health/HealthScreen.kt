@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package ru.lifety.feature.health
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -240,9 +242,9 @@ private val healthPanelSaver = Saver<HealthPanel?, String>(
     var hours by rememberSaveable { mutableStateOf("") }; var minutes by rememberSaveable { mutableStateOf("") }; var steps by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (sleep) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(hours, { hours = it.take(2) }, Modifier.weight(1f), label = { Text("Часы") }, singleLine = true, enabled = !state.saving, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            OutlinedTextField(minutes, { minutes = it.take(2) }, Modifier.weight(1f), label = { Text("Минуты") }, singleLine = true, enabled = !state.saving, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        } else OutlinedTextField(steps, { steps = it.take(8) }, Modifier.fillMaxWidth(), label = { Text("Шаги за день") }, singleLine = true, enabled = !state.saving, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            LifetyTextField(hours, { hours = it.take(2) }, Modifier.weight(1f), label = { Text("Часы") }, singleLine = true, enabled = !state.saving, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            LifetyTextField(minutes, { minutes = it.take(2) }, Modifier.weight(1f), label = { Text("Минуты") }, singleLine = true, enabled = !state.saving, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        } else LifetyTextField(steps, { steps = it.take(8) }, Modifier.fillMaxWidth(), label = { Text("Шаги за день") }, singleLine = true, enabled = !state.saving, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
         LifetyDateField("Дата", date, { date = it }, enabled = !state.saving)
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Button(onClick = { controller.save(hours, minutes, steps, LocalDate.parse(date)) }, enabled = !state.saving && (if (sleep) hours.isNotBlank() || minutes.isNotBlank() else steps.isNotBlank()), modifier = Modifier.fillMaxWidth()) { Text(if (state.saving) "Сохраняем…" else "Сохранить запись") }

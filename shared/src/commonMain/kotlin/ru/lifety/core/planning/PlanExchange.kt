@@ -5,9 +5,12 @@ import kotlinx.serialization.json.*
 import kotlinx.datetime.TimeZone
 import ru.lifety.core.model.*
 import kotlin.time.Instant
+import kotlinx.datetime.*
+import ru.lifety.core.planner.scheduleOnDate
+import ru.lifety.core.time.localDate
 
 @Serializable
-data class PlanSnapshot(val tasks: List<Task>, val goals: List<Goal>, val details: List<TaskPlan>)
+data class PlanSnapshot(val tasks: List<Task>, val goals: List<Goal>, val details: List<TaskPlan>, val schedule: List<ScheduleBlock> = emptyList())
 
 @Serializable
 data class PlannedTask(val taskId: String, val scheduledAt: String, val durationMinutes: Int, val approach: String, val goalId: String? = null)
@@ -22,7 +25,8 @@ data class ImportedPlan(val format: String, val baseSnapshot: String, val summar
 val planExchangeJson = Json { prettyPrint = true; encodeDefaults = true }
 
 fun snapshotFingerprint(snapshot: PlanSnapshot): String {
-    val canonical = Json.encodeToString(snapshot.copy(tasks = snapshot.tasks.sortedBy { it.id }, goals = snapshot.goals.sortedBy { it.id }, details = snapshot.details.sortedBy { it.taskId }))
+    val canonical = Json.encodeToString(snapshot.copy(tasks = snapshot.tasks.sortedBy { it.id }, goals = snapshot.goals.sortedBy { it.id }, details = snapshot.details.sortedBy { it.taskId },
+        schedule = snapshot.schedule.sortedBy { it.id }.map { it.copy(weekdays = it.weekdays.sorted().toSet()) }))
     var hash = -3750763034362895579L
     for (byte in canonical.encodeToByteArray()) hash = (hash xor (byte.toLong() and 255)) * 1099511628211L
     return hash.toULong().toString(16)
@@ -40,7 +44,7 @@ fun validateImportedPlan(plan: ImportedPlan, snapshot: PlanSnapshot, now: Long) 
     require(plan.format in setOf("lifety-plan-v1", "lifety-plan-v2")) { "Неподдерживаемый формат плана" }
     require(plan.format != "lifety-plan-v1" || plan.deferredTasks.isEmpty()) { "Для очереди задач нужен формат lifety-plan-v2" }
     require(plan.format != "lifety-plan-v2" || !plan.requestId.isNullOrBlank()) { "В ответе нужен requestId из текущего запроса" }
-    require(plan.baseSnapshot == snapshotFingerprint(snapshot)) { "Задачи, цели или план изменились после экспорта. Экспортируйте актуальные данные и получите новый план." }
+    require(plan.baseSnapshot == snapshotFingerprint(snapshot)) { "Задачи, цели или расписание изменились после экспорта. Экспортируйте актуальные данные и получите новый план." }
     require(plan.summary.isNotBlank() && plan.summary.length <= 6000) { "В плане нужно краткое объяснение до 6000 символов" }
     val active = snapshot.tasks.filterNot { it.isCompleted }.associateBy { it.id }
     require(active.isNotEmpty()) { "Нет актуальных задач для планирования" }
@@ -57,6 +61,15 @@ fun validateImportedPlan(plan: ImportedPlan, snapshot: PlanSnapshot, now: Long) 
             catch (_: Exception) { throw IllegalArgumentException("Время задачи должно быть ISO 8601 с часовым поясом, например 2026-10-28T09:00:00+03:00") }
         require(start >= now && start <= now + 5L * 366 * 86_400_000) { "Начало задачи должно быть в будущем, в пределах пяти лет" }
         val end = start + item.durationMinutes * 60_000L
+        val zone = TimeZone.currentSystemDefault()
+        var day = localDate(start, zone)
+        val lastDay = localDate(end - 1, zone)
+        while (day <= lastDay) {
+            require(scheduleOnDate(snapshot.schedule, day, zone).none { start < it.end && it.start < end }) {
+                "Задача пересекается с постоянным расписанием. Попросите ChatGPT выбрать свободные часы."
+            }
+            day = day.plus(DatePeriod(days = 1))
+        }
         val task = active.getValue(item.taskId)
         require(task.deadlineAt == null || task.deadlineAt <= now || end <= task.deadlineAt) { "Задача «${task.title}» заканчивается позже дедлайна. Попросите ChatGPT исправить план." }
         start to end
@@ -68,6 +81,7 @@ fun exportChatGptPrompt(snapshot: PlanSnapshot, now: Long, zone: TimeZone): Stri
     val context = buildJsonObject {
         put("format", "lifety-context-v1"); put("baseSnapshot", snapshotFingerprint(snapshot))
         put("exportedAt", Instant.fromEpochMilliseconds(now).toString()); put("timeZone", zone.id)
+        put("fixedSchedule", planExchangeJson.encodeToJsonElement(snapshot.schedule))
         put("tasks", JsonArray(snapshot.tasks.filterNot { it.isCompleted }.map { task -> buildJsonObject {
             put("id", task.id); put("title", task.title)
             put("scheduledAt", task.scheduledAt?.let { JsonPrimitive(Instant.fromEpochMilliseconds(it).toString()) } ?: JsonNull)
@@ -82,7 +96,7 @@ fun exportChatGptPrompt(snapshot: PlanSnapshot, now: Long, zone: TimeZone): Stri
 В финале верни ТОЛЬКО JSON, без Markdown и вступления:
 {"format":"lifety-plan-v1","baseSnapshot":"${snapshotFingerprint(snapshot)}","summary":"Объяснение плана","tasks":[{"taskId":"ID из tasks","scheduledAt":"ISO 8601 с UTC offset","durationMinutes":60,"approach":"Конкретные шаги выполнения","goalId":null}]}
 
-Сохрани baseSnapshot без изменений. Каждая незавершённая задача должна быть ровно один раз; не придумывай ID и не добавляй новые задачи. Не меняй названия, дедлайны и статус выполнения. goalId — ID подходящей активной цели или null. Длительность — целое 1..1440 минут. Запланируй время в будущем, без пересечений и так, чтобы работа закончилась до дедлайна. Если срок уже истёк, запланируй выполнение, явно отметь просрочку в summary; сам дедлайн не меняй. Если ограничения несовместимы, обсуди со мной перенос сроков, а не выдавай заведомо неверный JSON. Цели targetAt заданы в Unix milliseconds. Избегай сверхплотного дня, оставляй перерывы; оценки времени являются предположениями.
+Сохрани baseSnapshot без изменений. Каждая незавершённая задача должна быть ровно один раз; не придумывай ID и не добавляй новые задачи. Не меняй названия, дедлайны и статус выполнения. goalId — ID подходящей активной цели или null. Длительность — целое 1..1440 минут. Запланируй время в будущем, без пересечений и так, чтобы работа закончилась до дедлайна. Если срок уже истёк, запланируй выполнение, явно отметь просрочку в summary; сам дедлайн не меняй. Если ограничения несовместимы, обсуди со мной перенос сроков, а не выдавай заведомо неверный JSON. Цели targetAt заданы в Unix milliseconds. fixedSchedule — неподвижные занятия: startMinute/endMinute — минуты местных суток, weekdays — ISO-дни 1=Пн..7=Вс, date — разовая ISO-дата; endMinute <= startMinute означает следующий день. Не изменяй эти записи и не планируй задачи поверх них. Избегай сверхплотного дня, оставляй перерывы; оценки времени являются предположениями.
 
 ДАННЫЕ LIFETY:
 ${planExchangeJson.encodeToString(JsonObject.serializer(), context)}

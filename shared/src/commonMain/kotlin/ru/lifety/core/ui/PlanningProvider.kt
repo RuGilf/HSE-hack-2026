@@ -7,7 +7,8 @@ import ru.lifety.core.model.*
 import ru.lifety.core.repository.Repositories
 
 internal data class PlanningUiState(val loading: Boolean = false, val goals: List<Goal> = emptyList(),
-    val plans: Map<String, TaskPlan> = emptyMap(), val report: PlanReport? = null, val error: String? = null)
+    val plans: Map<String, TaskPlan> = emptyMap(), val report: PlanReport? = null, val error: String? = null,
+    val schedule: List<ScheduleBlock> = emptyList())
 internal val LocalPlanningState = staticCompositionLocalOf { PlanningUiState() }
 internal val LocalPlanningRetry = staticCompositionLocalOf<() -> Unit> { {} }
 
@@ -18,8 +19,8 @@ internal fun PlanningProvider(repositories: Repositories?, content: @Composable 
         val goals = repositories?.goals
         val planning = repositories?.planning
         if (goals == null || planning == null) { value = PlanningUiState(); return@produceState }
-        combine(goals.observeAll(), planning.observeAll(), planning.observeReport()) { g, p, r ->
-            PlanningUiState(goals = g, plans = p.associateBy { it.taskId }, report = r)
+        combine(goals.observeAll(), planning.observeAll(), planning.observeReport(), repositories.schedule?.observeAll() ?: flowOf(emptyList())) { g, p, r, s ->
+            PlanningUiState(goals = g, plans = p.associateBy { it.taskId }, report = r, schedule = s)
         }.catch { error ->
             if (error is CancellationException) throw error
             emit(PlanningUiState(error = "Не удалось загрузить цели и план"))

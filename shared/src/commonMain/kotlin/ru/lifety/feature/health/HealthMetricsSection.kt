@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package ru.lifety.feature.health
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -45,14 +47,14 @@ internal fun metricValueLabel(metric: CustomMetric, value: String): String = whe
     var name by rememberSaveable { mutableStateOf(initial.name) }; var unit by rememberSaveable { mutableStateOf(initial.unit) }
     var kind by rememberSaveable(stateSaver = metricKindSaver) { mutableStateOf(initial.kind) }; var aggregation by rememberSaveable(stateSaver = metricAggregationSaver) { mutableStateOf(initial.aggregation) }
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(name, { name = it.take(80) }, Modifier.fillMaxWidth(), label = { Text("Название") }, enabled = !busy)
+            LifetyTextField(name, { name = it.take(80) }, Modifier.fillMaxWidth(), label = { Text("Название") }, enabled = !busy)
             if (initial.sourceKey == null && !hasEntries) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricKind.entries.forEach { option ->
                 FilterChip(kind == option, { kind = option; if (kind != MetricKind.NUMBER) aggregation = MetricAggregation.LATEST }, enabled = !busy,
                     label = { Text(when (option) { MetricKind.NUMBER -> "Число"; MetricKind.TEXT -> "Заметка"; MetricKind.BOOLEAN -> "Да / нет" }) })
             }
             }
             if (kind == MetricKind.NUMBER) {
-                OutlinedTextField(unit, { unit = it.take(24) }, Modifier.fillMaxWidth(), label = { Text("Единица · необязательно") }, enabled = !busy && initial.sourceKey == null)
+                LifetyTextField(unit, { unit = it.take(24) }, Modifier.fillMaxWidth(), label = { Text("Единица · необязательно") }, enabled = !busy && initial.sourceKey == null)
                 Text("Итог за день", style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricAggregation.entries.forEach { option -> FilterChip(aggregation == option, { aggregation = option }, enabled = !busy && initial.sourceKey == null,
                     label = { Text(when (option) { MetricAggregation.LATEST -> "Последнее значение"; MetricAggregation.SUM -> "Сумма"; MetricAggregation.AVERAGE -> "Среднее" }) }) }
@@ -82,7 +84,7 @@ internal fun metricValueLabel(metric: CustomMetric, value: String): String = whe
             if (form) {
                 LifetyDateField("Дата записи", date, { date = it }, enabled = !busy)
                 if (metric.kind == MetricKind.BOOLEAN) Row { listOf("true" to "Да", "false" to "Нет").forEach { (v, title) -> FilterChip(value == v, { value = v }, enabled = !busy, label = { Text(title) }) } }
-                else OutlinedTextField(value, { value = it.take(if (metric.kind == MetricKind.TEXT) 4000 else 80) }, Modifier.fillMaxWidth(), label = { Text(if (metric.unit.isBlank()) "Значение" else "Значение · ${metric.unit}") }, enabled = !busy,
+                else LifetyTextField(value, { value = it.take(if (metric.kind == MetricKind.TEXT) 4000 else 80) }, Modifier.fillMaxWidth(), label = { Text(if (metric.unit.isBlank()) "Значение" else "Значение · ${metric.unit}") }, enabled = !busy,
                     keyboardOptions = KeyboardOptions(keyboardType = if (metric.kind == MetricKind.NUMBER) KeyboardType.Decimal else KeyboardType.Text), maxLines = if (metric.kind == MetricKind.TEXT) 6 else 1)
                 val normalized = runCatching { normalizedMetricValue(metric, value) }.getOrNull()
                 Button(onClick = {

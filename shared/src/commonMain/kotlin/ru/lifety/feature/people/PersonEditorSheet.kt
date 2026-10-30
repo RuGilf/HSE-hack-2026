@@ -1,5 +1,7 @@
 package ru.lifety.feature.people
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -81,7 +83,7 @@ internal fun PersonEditorSheet(initial: Person, isNew: Boolean, repository: Pers
                 if (!isNew) TextButton(onClick = { confirmDelete = true }, enabled = !blocked) { Text("Удалить", color = MaterialTheme.colorScheme.error) }
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(name, { name = it.take(200) }, label = { Text("ФИО или имя") }, modifier = Modifier.fillMaxWidth(),
+                LifetyTextField(name, { name = it.take(200) }, label = { Text("ФИО или имя") }, modifier = Modifier.fillMaxWidth(),
                     enabled = !blocked, isError = attempted && name.isBlank(), maxLines = 3,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

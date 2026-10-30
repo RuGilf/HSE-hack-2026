@@ -1,5 +1,7 @@
 package ru.lifety.feature.tasks
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -27,7 +29,7 @@ internal fun TaskDurationFields(state: TaskEditorState, model: TaskEditorViewMod
     val end = task.scheduledAt?.let { start -> duration?.let { start + it * 60_000L } }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Время на задачу", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(state.duration, model::setDuration, Modifier.fillMaxWidth(), label = { Text("Длительность, мин") },
+        LifetyTextField(state.duration, model::setDuration, Modifier.fillMaxWidth(), label = { Text("Длительность, мин") },
             placeholder = { Text("Например, 45") }, enabled = !state.saving, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), isError = invalidDuration,
             supportingText = { Text(if (invalidDuration) "Укажите 1..1440 минут. Для шагов и связи с целью нужна оценка времени."
@@ -39,7 +41,8 @@ internal fun TaskDurationFields(state: TaskEditorState, model: TaskEditorViewMod
         if (task.scheduledAt != null) {
             Text(end?.let { "${formatDateTime(task.scheduledAt)} → ${formatDateTime(it)}" } ?: "Укажите длительность, чтобы увидеть окончание", style = MaterialTheme.typography.bodyMedium)
             val initial = Instant.fromEpochMilliseconds(end ?: (task.scheduledAt + 30 * 60_000)).toLocalDateTime(TimeZone.currentSystemDefault())
-            ru.lifety.core.ui.LifetyTimeField("Время окончания", initial.hour, initial.minute, { hour, minute ->
+            if (duration == null) TextButton(onClick = { model.setDuration("30") }, enabled = !state.saving) { Text("Указать время окончания") }
+            else ru.lifety.core.ui.LifetyTimeField("Время окончания", initial.hour, initial.minute, { hour, minute ->
                 try { model.setDuration(durationUntil(task.scheduledAt, hour, minute).toString()); error = null }
                 catch (invalid: IllegalArgumentException) { error = invalid.message }
             }, enabled = !state.saving)
@@ -47,7 +50,7 @@ internal fun TaskDurationFields(state: TaskEditorState, model: TaskEditorViewMod
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        OutlinedTextField(state.approach, model::setApproach, Modifier.fillMaxWidth(), label = { Text("Шаги выполнения · необязательно") },
+        LifetyTextField(state.approach, model::setApproach, Modifier.fillMaxWidth(), label = { Text("Шаги выполнения · необязательно") },
             placeholder = { Text("Как будешь выполнять задачу") }, minLines = 2, maxLines = 6, enabled = !state.saving)
         val goals = LocalPlanningState.current.goals
         Box {

@@ -1,5 +1,7 @@
 package ru.lifety.feature.finance
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -98,7 +100,7 @@ private fun ColumnScope.CategoryDetails(initial: ExpenseCategory, categories: Li
     val draft = initial.copy(name = name.trim(), colorHex = hex.uppercase())
     val error = categoryValidationError(draft, categories)
     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        OutlinedTextField(name, { name = it.take(40) }, enabled = enabled, singleLine = true,
+        LifetyTextField(name, { name = it.take(40) }, enabled = enabled, singleLine = true,
             label = { Text("Название категории") }, modifier = Modifier.fillMaxWidth(), isError = attempted && name.isBlank())
         Text("Цвет категории", style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -112,7 +114,7 @@ private fun ColumnScope.CategoryDetails(initial: ExpenseCategory, categories: Li
                 }
             }
         }
-        OutlinedTextField(hex, { hex = it.take(7) }, enabled = enabled, singleLine = true,
+        LifetyTextField(hex, { hex = it.take(7) }, enabled = enabled, singleLine = true,
             label = { Text("HEX-цвет") }, supportingText = { Text("Свой цвет в формате #RRGGBB") },
             modifier = Modifier.fillMaxWidth(), isError = categoryHexColor(hex) == null)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

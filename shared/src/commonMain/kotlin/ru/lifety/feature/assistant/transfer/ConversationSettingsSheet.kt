@@ -1,5 +1,7 @@
 package ru.lifety.feature.assistant.transfer
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
@@ -72,9 +74,9 @@ internal fun ConversationSettingsSheet(preferences: ChatGptPreferences, busy: Bo
                     if (!tasks) Text("Без задач — обычное обсуждение. Импорт расписания будет выключен.", style = MaterialTheme.typography.bodySmall)
                     Text("Выключенные категории не войдут в новый запрос. Ранее отправленные сведения останутся в вашем разговоре ChatGPT.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    OutlinedTextField(instructions, { instructions = it.take(4000) }, Modifier.fillMaxWidth(), label = { Text("Постоянные предпочтения") },
+                    LifetyTextField(instructions, { instructions = it.take(4000) }, Modifier.fillMaxWidth(), label = { Text("Постоянные предпочтения") },
                         placeholder = { Text("Рабочие часы, доступное время, перерывы") }, minLines = 3, maxLines = 6, enabled = !busy)
-                    OutlinedTextField(url, { url = it.take(2048); urlError = false }, Modifier.fillMaxWidth(), label = { Text("Ссылка на разговор · необязательно") },
+                    LifetyTextField(url, { url = it.take(2048); urlError = false }, Modifier.fillMaxWidth(), label = { Text("Ссылка на разговор · необязательно") },
                         placeholder = { Text("https://chatgpt.com/c/…") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), singleLine = true, enabled = !busy,
                         isError = urlError, supportingText = { Text(if (urlError) "Нужна личная ссылка chatgpt.com/c/…, не публичная ссылка." else "Запрос можно скопировать и вставить в один постоянный чат.") })
                     Text("Предпочтения повторяются в запросе после изменений. Сохранённая ссылка открывается по вашему нажатию; отправляете сообщение вы сами.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

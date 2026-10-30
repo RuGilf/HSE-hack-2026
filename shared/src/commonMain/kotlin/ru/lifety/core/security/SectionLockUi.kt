@@ -37,7 +37,7 @@ internal fun SectionGuard(route: String, onBack: (() -> Unit)? = null, content: 
             var pin by remember(state.epoch, route) { mutableStateOf("") }
             LaunchedEffect(state.error) { if (state.error != null) pin = "" }
             PinPad(lockSections[route] ?: "План", "Введите код, чтобы открыть раздел", pin, { pin = it }, !state.busy,
-                "Открыть", { val entered = pin; pin = ""; controller?.unlock(entered) }, state.error, onBack)
+                "Открыть", { entered -> pin = ""; controller?.unlock(entered) }, state.error, onBack, autoSubmit = true)
         }
         else -> content()
     }
@@ -46,7 +46,8 @@ internal fun SectionGuard(route: String, onBack: (() -> Unit)? = null, content: 
 /** PIN digits are transient memory only: no saved state, text field, clipboard or accessibility value. */
 @Composable
 private fun PinPad(title: String, subtitle: String, pin: String, onPin: (String) -> Unit, enabled: Boolean,
-    action: String, submit: () -> Unit, error: String? = null, onBack: (() -> Unit)? = null) {
+    action: String, submit: (String) -> Unit, error: String? = null, onBack: (() -> Unit)? = null,
+    autoSubmit: Boolean = false) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.widthIn(max = 440.dp).fillMaxHeight().verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 28.dp + if (onBack == null) LocalBottomNavigationInset.current else 0.dp),
@@ -62,14 +63,21 @@ private fun PinPad(title: String, subtitle: String, pin: String, onPin: (String)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     row.forEach { digit ->
                         if (digit.isEmpty()) Spacer(Modifier.size(64.dp)) else OutlinedButton(
-                            onClick = { onPin(if (digit == "⌫") pin.dropLast(1) else (pin + digit).take(6)) }, enabled = enabled,
+                            onClick = {
+                                val next = if (digit == "⌫") pin.dropLast(1) else (pin + digit).take(6)
+                                onPin(next)
+                                if (autoSubmit && digit != "⌫" && validPin(next)) submit(next)
+                            }, enabled = enabled,
                             modifier = Modifier.size(64.dp), contentPadding = PaddingValues(0.dp), shape = MaterialTheme.shapes.extraLarge) {
                             Text(digit, style = MaterialTheme.typography.headlineSmall)
                         }
                     }
                 }
             }
-            Button(onClick = submit, enabled = enabled && validPin(pin), modifier = Modifier.fillMaxWidth()) { Text(if (enabled) action else "Проверяем…") }
+            if (autoSubmit) {
+                if (!enabled) CircularProgressIndicator(Modifier.size(24.dp))
+                else Text("Раздел откроется после шестой цифры", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else Button(onClick = { submit(pin) }, enabled = enabled && validPin(pin), modifier = Modifier.fillMaxWidth()) { Text(if (enabled) action else "Проверяем…") }
         }
     }
 }
@@ -90,7 +98,7 @@ internal fun SectionLockSettingsContent(onBack: () -> Unit) {
     LaunchedEffect(state.error) { if (state.error != null) currentPin = "" }
     if (step.isNotEmpty()) {
         PinPad(when (step) { "current" -> "Текущий код"; "new" -> "Новый код"; else -> "Повторите код" },
-            "6 цифр для выбранных разделов", input, { input = it; inputError = null }, !state.busy, "Продолжить", {
+            "6 цифр для выбранных разделов", input, { input = it; inputError = null }, !state.busy, "Продолжить", { _ ->
                 when (step) {
                     "current" -> { currentPin = input; input = ""; step = "" }
                     "new" -> { firstPin = input; input = ""; step = "confirm" }

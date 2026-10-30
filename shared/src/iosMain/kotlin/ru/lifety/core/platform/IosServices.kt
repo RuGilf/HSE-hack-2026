@@ -31,6 +31,7 @@ interface IosMetricSource {
 }
 
 object IosServices {
+    var arcNavigation: IosArcNavigationFactory? = null
     var credentials: IosCredentialStorage? = null
     var health: IosHealthSource? = null
     var sectionLocks: IosSectionLockStorage? = null

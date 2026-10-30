@@ -32,7 +32,7 @@ internal class PlanTransferController(private val repositories: Repositories, pr
                 val signals = listOfNotNull(
                     repositories.tasks.observeAll().map { Unit }, repositories.goals?.observeAll()?.map { Unit }, planning.observeAll().map { Unit },
                     repositories.health.observeAll().map { Unit }, exchange.observe().map { Unit }, repositories.healthMetrics?.observe()?.map { Unit },
-                    repositories.expenses.observeAll().map { Unit }, repositories.people?.observeAll()?.map { Unit })
+                    repositories.expenses.observeAll().map { Unit }, repositories.people?.observeAll()?.map { Unit }, repositories.schedule?.observeAll()?.map { Unit })
                 merge(*signals.toTypedArray()).conflate().collect {
                     val (snapshot, sleep, workspace, extra) = current()
                     val stale = workspace.draft?.let { it.sourceFingerprint != contextSourceFingerprint(snapshot, workspace.preferences, sleep, now(), zone(), extra) } ?: false

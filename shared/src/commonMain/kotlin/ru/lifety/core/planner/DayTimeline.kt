@@ -3,13 +3,15 @@ package ru.lifety.core.planner
 import kotlinx.datetime.*
 import ru.lifety.core.model.Task
 import ru.lifety.core.model.TaskPlan
+import ru.lifety.core.model.ScheduleBlock
 import ru.lifety.core.time.localDate
 import kotlin.time.Clock
 import kotlin.time.Instant
 
 data class TimeWindow(val start: Long, val end: Long) { val minutes get() = ((end - start) / 60_000).toInt() }
 data class TimedTask(val task: Task, val start: Long, val end: Long?, val overlaps: Boolean, val missesDeadline: Boolean)
-data class DayTimeline(val tasks: List<TimedTask>, val free: List<TimeWindow>, val busyMinutes: Int, val unknownDurations: Int)
+data class DayTimeline(val tasks: List<TimedTask>, val free: List<TimeWindow>, val busyMinutes: Int, val unknownDurations: Int,
+    val schedule: List<ScheduleOccurrence> = emptyList(), val window: TimeWindow? = null)
 
 /** Offers today's remaining time on quarter-hour boundaries; past days keep their appointments only. */
 fun availableTimeWindows(windows: List<TimeWindow>, date: LocalDate, now: Long,
@@ -25,7 +27,8 @@ fun availableTimeWindows(windows: List<TimeWindow>, date: LocalDate, now: Long,
 
 /** Intersections are half-open; occupied time is a union, so overlapping work is never double-counted. */
 fun dayTimeline(tasks: List<Task>, plans: Map<String, TaskPlan>, date: LocalDate,
-    zone: TimeZone = TimeZone.currentSystemDefault(), fromHour: Int = 8, untilHour: Int = 22): DayTimeline {
+    zone: TimeZone = TimeZone.currentSystemDefault(), fromHour: Int = 8, untilHour: Int = 22,
+    schedule: List<ScheduleBlock> = emptyList()): DayTimeline {
     require(fromHour in 0..23 && untilHour in 1..24 && fromHour < untilHour)
     val dayStart = date.atStartOfDayIn(zone).toEpochMilliseconds()
     val dayEnd = date.plus(DatePeriod(days = 1)).atStartOfDayIn(zone).toEpochMilliseconds()
@@ -39,11 +42,13 @@ fun dayTimeline(tasks: List<Task>, plans: Map<String, TaskPlan>, date: LocalDate
         if (start >= dayEnd || (end ?: (start + 1)) <= dayStart) return@mapNotNull null
         TimedTask(task, start, end, overlaps = false, missesDeadline = end != null && task.deadlineAt?.let { end > it } == true)
     }.sortedWith(compareBy<TimedTask> { it.start }.thenBy { it.task.id })
-    val marked = entries.map { item -> item.copy(overlaps = item.end != null && entries.any { other ->
-        other.task.id != item.task.id && other.end != null && item.start < other.end && other.start < item.end
-    }) }
-    val occupied = entries.mapNotNull { item -> item.end?.let { TimeWindow(maxOf(windowStart, item.start), minOf(windowEnd, it)) } }
-        .filter { it.end > it.start }
+    val fixed = scheduleOnDate(schedule, date, zone)
+    val marked = entries.map { item -> item.copy(overlaps = entries.any { other ->
+        other.task.id != item.task.id && other.end != null && item.start < other.end && other.start < (item.end ?: item.start + 1)
+    } || fixed.any { item.start < it.end && it.start < (item.end ?: item.start + 1) }) }
+    val occupied = (entries.mapNotNull { item -> item.end?.let { TimeWindow(item.start, it) } } + fixed.map { TimeWindow(it.start, it.end) })
+        .map { TimeWindow(maxOf(windowStart, it.start), minOf(windowEnd, it.end)) }
+        .filter { it.end > it.start }.sortedBy { it.start }
     val merged = mutableListOf<TimeWindow>()
     occupied.forEach { next ->
         val last = merged.lastOrNull()
@@ -54,7 +59,7 @@ fun dayTimeline(tasks: List<Task>, plans: Map<String, TaskPlan>, date: LocalDate
         merged.forEach { interval -> if (interval.start > cursor) add(TimeWindow(cursor, interval.start)); cursor = interval.end }
         if (cursor < windowEnd) add(TimeWindow(cursor, windowEnd))
     }
-    return DayTimeline(marked, free, merged.sumOf { it.minutes }, entries.count { it.end == null })
+    return DayTimeline(marked, free, merged.sumOf { it.minutes }, entries.count { it.end == null }, fixed, TimeWindow(windowStart, windowEnd))
 }
 
 fun taskIntervalError(task: Task, duration: Int?, now: Long = Clock.System.now().toEpochMilliseconds()): String? {

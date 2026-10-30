@@ -11,4 +11,5 @@ data class Expense(
     val category: String,
     val timestamp: Long,
     val source: String,
+    val note: String = "",
 )

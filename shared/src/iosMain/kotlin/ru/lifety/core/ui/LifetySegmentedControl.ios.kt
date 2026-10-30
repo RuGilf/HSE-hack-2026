@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.*
@@ -22,6 +23,7 @@ internal actual fun LifetySegmentedControl(labels: List<String>, selected: Int,
     require(labels.isNotEmpty())
     val choose by rememberUpdatedState(onSelect)
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val surface = LocalNativeSurfaceColor.current.takeOrElse { MaterialTheme.colorScheme.background }.toUiColor()
     val text = MaterialTheme.colorScheme.onSurface.toUiColor()
     val raised = MaterialTheme.colorScheme.surfaceContainerHighest.toUiColor()
     val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
@@ -30,23 +32,29 @@ internal actual fun LifetySegmentedControl(labels: List<String>, selected: Int,
     key(labels) {
         Box(modifier.heightIn(min = 44.dp), contentAlignment = Alignment.Center) {
             UIKitView(factory = {
-                object : UISegmentedControl(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
+                val control = object : UISegmentedControl(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
                     @ObjCAction fun selectionChanged() { choose(selectedSegmentIndex.toInt()) }
                 }.apply {
                     labels.forEachIndexed { index, label -> insertSegmentWithTitle(label, index.toULong(), animated = false) }
                     addTarget(this, NSSelectorFromString("selectionChanged"), UIControlEventValueChanged)
                 }
+                object : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
+                    init { addSubview(control) }
+                    override fun layoutSubviews() { super.layoutSubviews(); control.setFrame(bounds) }
+                }
             }, modifier = Modifier.fillMaxWidth().height(height),
                 properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.Cooperative(),
                     isNativeAccessibilityEnabled = true),
-                update = { control ->
+                update = { host ->
+                    host.backgroundColor = surface
+                    val control = host.subviews.first() as UISegmentedControl
                     control.enabled = enabled
                     control.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
                     control.selectedSegmentTintColor = raised
                     control.setTitleTextAttributes(mapOf(NSForegroundColorAttributeName to text, NSFontAttributeName to UIFont.systemFontOfSize(13.0 * fontScale)), UIControlStateNormal)
                     control.setTitleTextAttributes(mapOf(NSForegroundColorAttributeName to text, NSFontAttributeName to UIFont.systemFontOfSize(13.0 * fontScale, UIFontWeightSemibold)), UIControlStateSelected)
                     if (control.selectedSegmentIndex != selected.toLong()) control.selectedSegmentIndex = selected.toLong()
-                }, onRelease = { it.removeTarget(it, NSSelectorFromString("selectionChanged"), UIControlEventValueChanged) })
+                }, onRelease = { host -> (host.subviews.first() as UISegmentedControl).let { it.removeTarget(it, NSSelectorFromString("selectionChanged"), UIControlEventValueChanged) } })
         }
     }
 }

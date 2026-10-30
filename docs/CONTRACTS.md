@@ -803,3 +803,75 @@ TaskDateTimeField сворачивает controls, сохраняя value/callba
 Формат времени в нативных controls следует настройке iOS 12/24 часа; сохранение
 по-прежнему epoch milliseconds, общие текстовые подписи плана — 24-часовые.
 Границы ручной проверки — [IOS_NATIVE_UI.md](IOS_NATIVE_UI.md).
+
+
+## Расписание, заметки расходов и iOS-меню — актуальная schema 8
+
+Дополнения совместимы со старыми вызовами. `Task`, `TaskRepository`,
+`HealthSnapshot`, `HealthRepository` и существующие входы `XxxScreen(modifier)`
+сохранены. Путь `C` ниже — `shared/src/commonMain/kotlin/ru/lifety`.
+
+```kotlin
+// C/core/model/ScheduleBlock.kt, package ru.lifety.core.model
+@Serializable data class ScheduleBlock(
+    val id: String,
+    val title: String,
+    val startMinute: Int,
+    val endMinute: Int,
+    val weekdays: Set<Int> = emptySet(),
+    val date: String? = null,
+)
+// C/core/repository/ScheduleRepository.kt, package ru.lifety.core.repository
+interface ScheduleRepository {
+    fun observeAll(): Flow<List<ScheduleBlock>>
+    suspend fun upsert(block: ScheduleBlock)
+    suspend fun delete(id: String)
+}
+```
+
+- Минуты местных суток 0..1439. ISO weekdays 1=Пн..7=Вс. Либо непустое множество
+  дней и date=null, либо date=ISO civil date и пустые weekdays. End <= start —
+  окончание на следующие сутки (равенство — сутки). Часовой пояс устройства:
+  постоянные часы остаются местными при поездках. DST разрешается kotlinx.datetime;
+  неположительные интервалы не создаются. Исключений повторений и срока серии пока нет.
+- `Repositories.schedule: ScheduleRepository? = null` — добавленный последний
+  параметр. `AppContainer` подключает `SqlDelightScheduleRepository` на общем
+  dispatcher/connection. `LocalPlanningState.schedule` наблюдает тот же Flow.
+- `core/planner/Schedule.kt`: `scheduleError`, `scheduleOnDate` →
+  `ScheduleOccurrence(block,start,end)`; start/end — UTC epoch milliseconds.
+  Ночные занятия присутствуют на обоих днях, без размножения задач в БД.
+- `dayTimeline` сохраняет старые параметры, в конце добавляет
+  `schedule: List<ScheduleBlock> = emptyList()`. `DayTimeline` дополнен schedule/window;
+  busy/free — объединение интервалов задач и занятий в выбранных часах,
+  пересечения half-open. Длительность задач без оценки не придумывается.
+- `feature/schedule/ScheduleScreen.kt`: `ScheduleScreen(modifier: Modifier = Modifier)`.
+  Четвёртая вкладка Плана, индексы День=0/Календарь=1/Люди=2 сохранены.
+  Общая сетка `feature/tasks/DayTimeGrid.kt`; календарь и сетка открывают общий
+  `ScheduleEditorSheet`. Корневые route IDs и 1–5 настраиваемых разделов не меняются.
+- SQL `Lifety.sq`, migration `7.sqm` (7→8): новая scheduleBlock с weekday bitmask
+  (бит0=Пн). Создание/обновление/удаление реактивны. Migration `6.sqm` (6→7)
+  добавляет expense.note TEXT DEFAULT '' и navigationPreference.presentation
+  TEXT DEFAULT 'tabs'; старые расходы/настройки сохраняются.
+- `Expense` дополнен последним `note: String = ""`. Заметка до 2000 символов,
+  редактируется отдельно от merchant, хранится и показывается в истории. Старый
+  сериализованный JSON читается; agent expense_upsert сохраняет имеющуюся note.
+- `PlanSnapshot` дополнен `schedule: List<ScheduleBlock> = emptyList()`.
+  Snapshot транзакционный; fingerprint включает занятия и нормализованные weekdays.
+  ChatGPT v1/v2 получает fixedSchedule, когда включены задачи. Обновление расписания
+  делает старый draft/ответ устаревшим; apply проверяет занятые интервалы повторно.
+  Встроенный агент получает read-only data/fixedSchedule при доступе к задачам.
+- `NavigationPreferencesRepository` дополнен observePresentation и saveConfiguration.
+  SQL сохраняет routes+presentation атомарно; старый save(routes) сохраняет вид.
+  Значения tabs/arc. Android использует прежнюю панель; iOS выбирает native
+  UITabBar или `IosArcNavigationFactory` из IosServices. Контракты bridge —
+  `shared/src/iosMain/kotlin/ru/lifety/core/platform/IosArcNavigation.kt`;
+  SwiftUI factory/session/model/view — `iosApp/Lifety/LifetyApp.swift`.
+  Обычная панель по умолчанию, отсутствие factory даёт UITabBar fallback.
+- SectionGuard автоматически передаёт ровно шесть введённых цифр unlock;
+  wizard создания/смены кода остаётся с подтверждением. Rate limit и хранение
+  защиты не менялись. Автопроверка не создаёт и не сохраняет credentials.
+- `core/ui/LifetyTextField.kt`, `NativeSurfaceColor.kt`, `SheetSwipe.kt` — общий
+  iOS form/gesture слой. Бизнес-логика остаётся в commonMain, полная миграция
+  экранов на SwiftUI не выполнялась.
+
+Проверки и ограничения текущего изменения: [SCHEDULE_AND_IOS_FIXES.md](SCHEDULE_AND_IOS_FIXES.md).

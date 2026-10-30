@@ -1,5 +1,7 @@
 package ru.lifety.feature.goals
 
+import ru.lifety.core.ui.LifetyTextField
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -91,8 +93,8 @@ private fun ColumnScope.GoalEditor(initial: Goal, enabled: Boolean, onSave: (Goa
     var date by rememberSaveable(initial.id) { mutableStateOf(initial.targetAt?.let { localDate(it).toString() }) }
     var completed by rememberSaveable(initial.id) { mutableStateOf(initial.isCompleted) }
     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        OutlinedTextField(title, { title = it.take(200) }, label = { Text("Чего хочу достичь") }, modifier = Modifier.fillMaxWidth(), enabled = enabled)
-        OutlinedTextField(description, { description = it.take(6000) }, label = { Text("Зачем это важно и что нужно сделать") }, modifier = Modifier.fillMaxWidth(), minLines = 3, enabled = enabled)
+        LifetyTextField(title, { title = it.take(200) }, label = { Text("Чего хочу достичь") }, modifier = Modifier.fillMaxWidth(), enabled = enabled)
+        LifetyTextField(description, { description = it.take(6000) }, label = { Text("Зачем это важно и что нужно сделать") }, modifier = Modifier.fillMaxWidth(), minLines = 3, enabled = enabled)
         if (date == null) OutlinedButton(onClick = { date = today().toString() }, enabled = enabled) { Text("Добавить срок") }
         else {
             LifetyDateField("Достичь к", date!!, { date = it }, enabled = enabled)

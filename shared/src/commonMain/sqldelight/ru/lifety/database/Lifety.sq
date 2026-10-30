@@ -17,7 +17,8 @@ CREATE TABLE expense (
     merchant TEXT NOT NULL,
     category TEXT NOT NULL,
     timestamp INTEGER NOT NULL,
-    source TEXT NOT NULL
+    source TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE healthSnapshot (
@@ -53,8 +54,8 @@ selectExpenses:
 SELECT * FROM expense ORDER BY timestamp DESC, id ASC;
 
 upsertExpense:
-INSERT OR REPLACE INTO expense(id, amountMinor, currency, merchant, category, timestamp, source)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO expense(id, amountMinor, currency, merchant, category, timestamp, source, note)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteExpense:
 DELETE FROM expense WHERE id = ?;
@@ -155,7 +156,8 @@ CREATE TABLE healthEntry (
 CREATE INDEX healthEntryMetricTime ON healthEntry(metricId, timestamp);
 CREATE TABLE navigationPreference (
     id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
-    routes TEXT NOT NULL
+    routes TEXT NOT NULL,
+    presentation TEXT NOT NULL DEFAULT 'tabs'
 );
 
 selectHealthMetrics:
@@ -171,4 +173,27 @@ DELETE FROM healthEntry WHERE id = ?;
 selectNavigationPreference:
 SELECT routes FROM navigationPreference WHERE id = 1;
 upsertNavigationPreference:
-INSERT OR REPLACE INTO navigationPreference VALUES (1, ?);
+INSERT OR REPLACE INTO navigationPreference(id, routes, presentation)
+VALUES (1, ?, COALESCE((SELECT presentation FROM navigationPreference WHERE id = 1), 'tabs'));
+
+selectNavigationPresentation:
+SELECT presentation FROM navigationPreference WHERE id = 1;
+
+upsertNavigationConfiguration:
+INSERT OR REPLACE INTO navigationPreference(id, routes, presentation) VALUES (1, ?, ?);
+
+-- Fixed timetable, independent of task estimates and completion.
+CREATE TABLE scheduleBlock (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    startMinute INTEGER NOT NULL,
+    endMinute INTEGER NOT NULL,
+    weekdays INTEGER NOT NULL,
+    date TEXT
+);
+selectScheduleBlocks:
+SELECT * FROM scheduleBlock ORDER BY startMinute, id;
+upsertScheduleBlock:
+INSERT OR REPLACE INTO scheduleBlock VALUES (?, ?, ?, ?, ?, ?);
+deleteScheduleBlock:
+DELETE FROM scheduleBlock WHERE id = ?;

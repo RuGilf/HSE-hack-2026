@@ -106,7 +106,7 @@ class RepositoryPersistenceTest {
     fun everyRepositoryRestoresDataAfterClosingAndReopeningFile() = runBlocking {
         val file = Files.createTempFile("lifety-persistence-", ".db")
         val task = Task("t", "После перезапуска", null, 1792886400000L, true)
-        val expense = Expense("e", 9_007_199_254_740_993L, "RUB", "Store", "other", 200, "manual")
+        val expense = Expense("e", 9_007_199_254_740_993L, "RUB", "Store", "other", 200, "manual", note = "Хлеб, молоко и кофе")
         val health = HealthSnapshot(200, null, 12345)
         try {
             val firstDriver = JdbcSqliteDriver("jdbc:sqlite:$file")
