@@ -23,13 +23,21 @@ internal actual fun LifetySegmentedControl(labels: List<String>, selected: Int,
     require(labels.isNotEmpty())
     val choose by rememberUpdatedState(onSelect)
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val surface = LocalNativeSurfaceColor.current.takeOrElse { MaterialTheme.colorScheme.background }.toUiColor()
-    val text = MaterialTheme.colorScheme.onSurface.toUiColor()
-    val raised = MaterialTheme.colorScheme.surfaceContainerHighest.toUiColor()
+    val surfaceColor = LocalNativeSurfaceColor.current.takeOrElse { MaterialTheme.colorScheme.background }
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val raisedColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val surface = remember(surfaceColor) { surfaceColor.toUiColor() }
+    val raised = remember(raisedColor) { raisedColor.toUiColor() }
     val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     val height = (32 * fontScale).dp
+    val attributes = remember(textColor, fontScale) {
+        val text = textColor.toUiColor()
+        mapOf<Any?, Any>(NSForegroundColorAttributeName to text, NSFontAttributeName to UIFont.systemFontOfSize(13.0 * fontScale)) to
+            mapOf<Any?, Any>(NSForegroundColorAttributeName to text, NSFontAttributeName to UIFont.systemFontOfSize(13.0 * fontScale, UIFontWeightSemibold))
+    }
     // A separate remembered UIKit instance is unnecessary: UIKitView owns its lifetime.
     key(labels) {
+        val applied = remember { object { var attributes: Any? = null } }
         Box(modifier.heightIn(min = 44.dp), contentAlignment = Alignment.Center) {
             UIKitView(factory = {
                 val control = object : UISegmentedControl(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
@@ -46,15 +54,19 @@ internal actual fun LifetySegmentedControl(labels: List<String>, selected: Int,
                 properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.Cooperative(),
                     isNativeAccessibilityEnabled = true),
                 update = { host ->
-                    host.backgroundColor = surface
+                    if (host.backgroundColor != surface) host.backgroundColor = surface
                     val control = host.subviews.first() as UISegmentedControl
-                    control.enabled = enabled
-                    control.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
-                    control.selectedSegmentTintColor = raised
-                    control.setTitleTextAttributes(mapOf(NSForegroundColorAttributeName to text, NSFontAttributeName to UIFont.systemFontOfSize(13.0 * fontScale)), UIControlStateNormal)
-                    control.setTitleTextAttributes(mapOf(NSForegroundColorAttributeName to text, NSFontAttributeName to UIFont.systemFontOfSize(13.0 * fontScale, UIFontWeightSemibold)), UIControlStateSelected)
+                    if (control.enabled != enabled) control.enabled = enabled
+                    val style = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
+                    if (control.overrideUserInterfaceStyle != style) control.overrideUserInterfaceStyle = style
+                    if (control.selectedSegmentTintColor != raised) control.selectedSegmentTintColor = raised
+                    if (applied.attributes !== attributes) {
+                        control.setTitleTextAttributes(attributes.first, UIControlStateNormal)
+                        control.setTitleTextAttributes(attributes.second, UIControlStateSelected)
+                        applied.attributes = attributes
+                    }
                     if (control.selectedSegmentIndex != selected.toLong()) control.selectedSegmentIndex = selected.toLong()
-                }, onRelease = { host -> (host.subviews.first() as UISegmentedControl).let { it.removeTarget(it, NSSelectorFromString("selectionChanged"), UIControlEventValueChanged) } })
+                }, onRelease = { host -> applied.attributes = null; (host.subviews.first() as UISegmentedControl).let { it.removeTarget(it, NSSelectorFromString("selectionChanged"), UIControlEventValueChanged) } })
         }
     }
 }

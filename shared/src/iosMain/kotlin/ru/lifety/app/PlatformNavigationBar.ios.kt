@@ -65,11 +65,15 @@ internal actual fun PlatformNavigationBar(selected: AppDestination, onSelect: (A
         }, modifier = Modifier.fillMaxWidth().height(LocalBottomNavigationInset.current),
             properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.NonCooperative,
                 isNativeAccessibilityEnabled = true, placedAsOverlay = true), update = { bar ->
-            bar.tintColor = accent.toUiColor()
-            bar.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
-            bar.unselectedItemTintColor = secondary.toUiColor()
+            val tint = accent.toUiColor()
+            if (bar.tintColor != tint) bar.tintColor = tint
+            val style = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
+            if (bar.overrideUserInterfaceStyle != style) bar.overrideUserInterfaceStyle = style
+            val unselectedTint = secondary.toUiColor()
+            if (bar.unselectedItemTintColor != unselectedTint) bar.unselectedItemTintColor = unselectedTint
             if (bar.items?.map { (it as UITabBarItem).tag } != items.map { it.tag }) bar.setItems(items, animated = false)
-            bar.selectedItem = destinations.indexOf(selected).takeIf { it >= 0 }?.let { items[it] }
+            val selectedItem = destinations.indexOf(selected).takeIf { it >= 0 }?.let { items[it] }
+            if (bar.selectedItem != selectedItem) bar.selectedItem = selectedItem
         })
     }
 }

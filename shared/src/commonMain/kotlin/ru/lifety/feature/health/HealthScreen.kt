@@ -68,7 +68,10 @@ private val healthPanelSaver = Saver<HealthPanel?, String>(
     var now by remember { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
     LaunchedEffect(Unit) { while (true) { delay(60_000); now = Clock.System.now().toEpochMilliseconds() } }
     val today = localDate(now)
-    val history = remember(state.history, now) { state.history.filter { it.timestamp <= now }.sortedBy { it.timestamp } }
+    val preparedHistory by produceState<List<HealthSnapshot>?>(null, state.history, now) {
+        value = withContext(Dispatchers.Default) { state.history.filter { it.timestamp <= now }.sortedBy { it.timestamp } }
+    }
+    val history = preparedHistory.orEmpty()
     val sleep = history.lastOrNull { it.sleepMinutes != null }
     val steps = history.lastOrNull { it.steps != null }
     val inset = LocalBottomNavigationInset.current
@@ -102,7 +105,7 @@ private val healthPanelSaver = Saver<HealthPanel?, String>(
                     Text(formatDate(today), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            if (state.loading || preparedHistory == null) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     SummaryMetricCard("Сон", sleep?.sleepMinutes?.let(::sleepLabel) ?: "Нет записей", sleep?.timestamp, LifetySymbol.Sleep, Modifier.weight(1f)) { panel = HealthPanel.Builtin(true) }
@@ -215,7 +218,13 @@ private val healthPanelSaver = Saver<HealthPanel?, String>(
 @Composable private fun BuiltinHealthContent(sleep: Boolean, history: List<HealthSnapshot>, today: LocalDate, onAdd: (LocalDate) -> Unit) {
     var periodName by rememberSaveable { mutableStateOf(HealthPeriod.WEEK.name) }
     val period = HealthPeriod.valueOf(periodName)
-    val timeline = remember(history, period, today) { healthTimeline(history, period, today) }
+    val calculationKey = remember(history, period, today) { Any() }
+    val timelineState = key(calculationKey) {
+        produceState<HealthTimeline?>(null) { value = withContext(Dispatchers.Default) { healthTimeline(history, period, today) } }
+    }
+    val timeline = timelineState.value
+    if (timeline == null) { LinearProgressIndicator(Modifier.fillMaxWidth().padding(20.dp)); return }
+    val recordedDays = remember(timeline, sleep) { timeline.days.filter { if (sleep) it.sleepMinutes != null else it.steps != null }.asReversed() }
     var selectedDate by remember { mutableStateOf("") }
     val selected = timeline.days.indexOfFirst { it.date.toString() == selectedDate }.takeIf { it >= 0 } ?: timeline.days.lastIndex
     val day = timeline.days.getOrNull(selected)
@@ -231,7 +240,7 @@ private val healthPanelSaver = Saver<HealthPanel?, String>(
         }
         item { Button(onClick = { onAdd(day?.date ?: today) }, modifier = Modifier.fillMaxWidth()) { Text("Добавить запись") } }
         item { Text("История", style = MaterialTheme.typography.titleMedium) }
-        items(timeline.days.filter { if (sleep) it.sleepMinutes != null else it.steps != null }.asReversed(), key = { it.date.toString() }) { row ->
+        items(recordedDays, key = { it.date.toString() }) { row ->
             ListItem(headlineContent = { Text(if (sleep) sleepLabel(row.sleepMinutes) else "${row.steps} шагов") }, supportingContent = { Text(formatDate(row.date)) }, modifier = Modifier.clickable { selectedDate = row.date.toString() })
         }
     }

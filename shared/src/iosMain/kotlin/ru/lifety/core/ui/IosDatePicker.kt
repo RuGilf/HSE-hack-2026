@@ -53,11 +53,13 @@ internal fun IosDatePicker(value: Long, mode: UIDatePickerMode, label: String,
         properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.Cooperative(),
             isNativeAccessibilityEnabled = true),
         update = { picker ->
-            picker.backgroundColor = backgroundColor.toUiColor()
-            picker.enabled = enabled
-            picker.accessibilityLabel = label
-            picker.tintColor = accent
-            picker.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
+            val background = backgroundColor.toUiColor()
+            if (picker.backgroundColor != background) picker.backgroundColor = background
+            if (picker.enabled != enabled) picker.enabled = enabled
+            if (picker.accessibilityLabel != label) picker.accessibilityLabel = label
+            if (picker.tintColor != accent) picker.tintColor = accent
+            val style = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
+            if (picker.overrideUserInterfaceStyle != style) picker.overrideUserInterfaceStyle = style
             if (abs(picker.date.timeIntervalSince1970 - value / 1000.0) >= .001) {
                 picker.setDate(NSDate.dateWithTimeIntervalSince1970(value / 1000.0), animated = false)
             }

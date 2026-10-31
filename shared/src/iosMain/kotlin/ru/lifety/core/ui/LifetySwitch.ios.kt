@@ -43,12 +43,12 @@ internal actual fun LifetySwitch(checked: Boolean, onCheckedChange: (Boolean) ->
     }, modifier = modifier.size(80.dp, 44.dp),
         properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.Cooperative(), isNativeAccessibilityEnabled = true),
         update = { host ->
-            host.backgroundColor = surface
-            host.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
+            if (host.backgroundColor != surface) host.backgroundColor = surface
+            val style = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
+            if (host.overrideUserInterfaceStyle != style) host.overrideUserInterfaceStyle = style
             val control = host.subviews.first() as UISwitch
-            control.enabled = enabled
-            control.onTintColor = accent
+            if (control.enabled != enabled) control.enabled = enabled
+            if (control.onTintColor != accent) control.onTintColor = accent
             if (control.on != checked) control.setOn(checked, animated = false)
-            host.setNeedsLayout()
         }, onRelease = { host -> (host.subviews.first() as UISwitch).let { it.removeTarget(it, NSSelectorFromString("valueChanged"), UIControlEventValueChanged) } })
 }

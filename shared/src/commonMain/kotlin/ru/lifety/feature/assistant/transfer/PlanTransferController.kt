@@ -35,7 +35,7 @@ internal class PlanTransferController(private val repositories: Repositories, pr
                     repositories.expenses.observeAll().map { Unit }, repositories.people?.observeAll()?.map { Unit }, repositories.schedule?.observeAll()?.map { Unit })
                 merge(*signals.toTypedArray()).conflate().collect {
                     val (snapshot, sleep, workspace, extra) = current()
-                    val stale = workspace.draft?.let { it.sourceFingerprint != contextSourceFingerprint(snapshot, workspace.preferences, sleep, now(), zone(), extra) } ?: false
+                    val stale = withContext(Dispatchers.Default) { workspace.draft?.let { it.sourceFingerprint != contextSourceFingerprint(snapshot, workspace.preferences, sleep, now(), zone(), extra) } ?: false }
                     mutable.value = state.value.copy(snapshot = snapshot, sleep = sleep, workspace = workspace, extra = extra, loading = false, draftStale = stale)
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -81,10 +81,10 @@ internal class PlanTransferController(private val repositories: Repositories, pr
         mutable.value = state.value.copy(preview = null)
         onSaved()
     }
-    private fun checkDraft(snapshot: PlanSnapshot, sleep: SleepContext?, workspace: ChatGptWorkspace, extra: JsonObject?): ChatGptDraft {
+    private suspend fun checkDraft(snapshot: PlanSnapshot, sleep: SleepContext?, workspace: ChatGptWorkspace, extra: JsonObject?): ChatGptDraft = withContext(Dispatchers.Default) {
         val draft = requireNotNull(workspace.draft) { "Подготовьте запрос" }
         require(draft.sourceFingerprint == contextSourceFingerprint(snapshot, workspace.preferences, sleep, now(), zone(), extra)) { "Данные изменились. Подготовьте актуальное обновление." }
-        return draft
+        draft
     }
     fun handoff(onReady: (String) -> Unit) = run {
         val (snapshot, sleep, workspace, extra) = current()
@@ -99,8 +99,10 @@ internal class PlanTransferController(private val repositories: Repositories, pr
     fun preview(text: String) = run {
         val parsed = withContext(Dispatchers.Default) { parseImportedPlan(text) }
         val (snapshot, sleep, workspace, extra) = current()
-        validateImportedPlan(parsed, snapshot, now())
-        validateChatGptResponse(parsed, workspace, snapshot, sleep, now(), zone(), extra)
+        withContext(Dispatchers.Default) {
+            validateImportedPlan(parsed, snapshot, now())
+            validateChatGptResponse(parsed, workspace, snapshot, sleep, now(), zone(), extra)
+        }
         mutable.value = state.value.copy(preview = parsed, snapshot = snapshot)
     }
     fun apply() {

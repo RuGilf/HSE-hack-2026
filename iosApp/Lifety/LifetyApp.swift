@@ -63,7 +63,8 @@ private final class NativeArcNavigationSession: NSObject, @preconcurrency IosArc
         if model.accentValue != accent { model.accentValue = accent; model.accent = Color(uiColor: arcColor(accent)) }
         if model.textValue != text { model.textValue = text; model.text = Color(uiColor: arcColor(text)) }
         if model.safeBottom != safeBottom { model.safeBottom = safeBottom }
-        host.overrideUserInterfaceStyle = dark ? .dark : .light
+        let style: UIUserInterfaceStyle = dark ? .dark : .light
+        if host.overrideUserInterfaceStyle != style { host.overrideUserInterfaceStyle = style }
     }
     func close() { model.events = nil }
 }

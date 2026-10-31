@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -26,8 +27,9 @@ internal fun DayTimeGrid(timeline: DayTimeline, date: LocalDate, zone: TimeZone,
     val window = timeline.window ?: return
     val height = (window.minutes * 1.2f).dp
     fun top(at: Long) = (((at - window.start) / 60_000f) * 1.2f).dp
-    val fixed = timeline.schedule.map { GridBlock("${it.block.id}:${it.start}", it.block.title, it.start, it.end) }
-    val tasks = timeline.tasks.map { GridBlock(it.task.id, it.task.title, it.start, it.end ?: it.start + 15 * 60_000L, it.overlaps) }
+    val fixed = remember(timeline.schedule) { timeline.schedule.map { GridBlock("${it.block.id}:${it.start}", it.block.title, it.start, it.end) } }
+    val tasks = remember(timeline.tasks) { timeline.tasks.map { GridBlock(it.task.id, it.task.title, it.start, it.end ?: it.start + 15 * 60_000L, it.overlaps) } }
+    val byId = remember(timeline.tasks) { timeline.tasks.associateBy { it.task.id } }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().padding(start = 48.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Расписание", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -45,7 +47,7 @@ internal fun DayTimeGrid(timeline: DayTimeline, date: LocalDate, zone: TimeZone,
             }
             Row(Modifier.fillMaxWidth().padding(start = 48.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 GridColumn(fixed, window, Modifier.weight(1f).height(height), false, zone, null) { id -> openSchedule(id.substringBeforeLast(':')) }
-                GridColumn(tasks, window, Modifier.weight(1f).height(height), true, zone, create) { id -> timeline.tasks.find { it.task.id == id }?.task?.let(open) }
+                GridColumn(tasks, window, Modifier.weight(1f).height(height), true, zone, create) { id -> byId[id]?.task?.let(open) }
             }
         }
         Text("Коснитесь записи, чтобы изменить её, или свободного часа справа, чтобы добавить дело. Дела без длительности отмечены коротким блоком.",
@@ -55,14 +57,16 @@ internal fun DayTimeGrid(timeline: DayTimeline, date: LocalDate, zone: TimeZone,
 
 @Composable
 private fun GridColumn(blocks: List<GridBlock>, window: TimeWindow, modifier: Modifier, tasks: Boolean, zone: TimeZone, create: ((Long) -> Unit)?, onOpen: (String) -> Unit) {
-    val visible = blocks.filter { it.start < window.end && it.end > window.start }.sortedWith(compareBy<GridBlock> { it.start }.thenBy { it.id })
-    val laneEnds = mutableListOf<Long>()
-    val placed = visible.map { block ->
-        val free = laneEnds.indexOfFirst { it <= block.start }
-        val lane = if (free < 0) laneEnds.size.also { laneEnds += block.end } else free.also { laneEnds[it] = block.end }
-        PlacedBlock(block, lane)
+    val tracks = remember(blocks, window) {
+        val visible = blocks.filter { it.start < window.end && it.end > window.start }.sortedWith(compareBy<GridBlock> { it.start }.thenBy { it.id })
+        val laneEnds = mutableListOf<Long>()
+        visible.map { block ->
+            val free = laneEnds.indexOfFirst { it <= block.start }
+            val lane = if (free < 0) laneEnds.size.also { laneEnds += block.end } else free.also { laneEnds[it] = block.end }
+            PlacedBlock(block, lane)
+        }.groupBy { it.lane }.values.toList()
     }
-    val lanes = laneEnds.size.coerceAtLeast(1)
+    val lanes = tracks.size.coerceAtLeast(1)
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         repeat(lanes) { lane ->
             Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -76,7 +80,7 @@ private fun GridColumn(blocks: List<GridBlock>, window: TimeWindow, modifier: Mo
                         hour += 60 * 60_000L
                     }
                 }
-                placed.filter { it.lane == lane }.forEach { (block, _) ->
+                tracks.getOrElse(lane) { emptyList() }.forEach { (block, _) ->
                     val from = maxOf(window.start, block.start)
                     val until = minOf(window.end, block.end)
                     val color = when { block.conflict -> MaterialTheme.colorScheme.errorContainer; tasks -> MaterialTheme.colorScheme.primaryContainer; else -> MaterialTheme.colorScheme.surfaceContainerHigh }

@@ -42,12 +42,13 @@ internal class NavigationController(private val repository: NavigationPreference
     }
 }
 internal val LocalNavigationController = staticCompositionLocalOf<NavigationController?> { null }
-internal val LocalNavigationState = staticCompositionLocalOf { NavigationState() }
-internal val LocalNavigationItems = staticCompositionLocalOf { defaultNavigation.map(AppDestination::fromRoute) }
+internal val LocalNavigationState = compositionLocalOf { NavigationState() }
+internal val LocalNavigationItems = compositionLocalOf { defaultNavigation.map(AppDestination::fromRoute) }
 @Composable internal fun NavigationProvider(repository: NavigationPreferencesRepository?, content: @Composable () -> Unit) {
     val scope = rememberCoroutineScope()
     val controller = remember(repository, scope) { NavigationController(repository, scope) }
     val state by controller.state.collectAsState()
+    val items = remember(state.routes) { state.routes.map(AppDestination::fromRoute) }
     CompositionLocalProvider(LocalNavigationController provides controller, LocalNavigationState provides state,
-        LocalNavigationItems provides state.routes.map(AppDestination::fromRoute), content = content)
+        LocalNavigationItems provides items, content = content)
 }

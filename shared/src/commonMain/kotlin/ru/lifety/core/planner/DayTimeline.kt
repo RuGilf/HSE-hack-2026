@@ -43,9 +43,13 @@ fun dayTimeline(tasks: List<Task>, plans: Map<String, TaskPlan>, date: LocalDate
         TimedTask(task, start, end, overlaps = false, missesDeadline = end != null && task.deadlineAt?.let { end > it } == true)
     }.sortedWith(compareBy<TimedTask> { it.start }.thenBy { it.task.id })
     val fixed = scheduleOnDate(schedule, date, zone)
-    val marked = entries.map { item -> item.copy(overlaps = entries.any { other ->
-        other.task.id != item.task.id && other.end != null && item.start < other.end && other.start < (item.end ?: item.start + 1)
-    } || fixed.any { item.start < it.end && it.start < (item.end ?: item.start + 1) }) }
+    val taskIntervals = IntervalIndex(entries.mapNotNull { item -> item.end?.let { TimeWindow(item.start, it) } })
+    val fixedIntervals = IntervalIndex(fixed.map { TimeWindow(it.start, it.end) })
+    val marked = entries.map { item ->
+        val end = item.end ?: item.start + 1
+        val self = if (item.end != null) 1 else 0
+        item.copy(overlaps = taskIntervals.count(item.start, end) > self || fixedIntervals.count(item.start, end) > 0)
+    }
     val occupied = (entries.mapNotNull { item -> item.end?.let { TimeWindow(item.start, it) } } + fixed.map { TimeWindow(it.start, it.end) })
         .map { TimeWindow(maxOf(windowStart, it.start), minOf(windowEnd, it.end)) }
         .filter { it.end > it.start }.sortedBy { it.start }

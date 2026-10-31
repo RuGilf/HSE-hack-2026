@@ -1,6 +1,9 @@
 package ru.lifety.app
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import ru.lifety.core.ui.isIos
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -35,7 +38,7 @@ fun PlanScreen(initialCalendar: Boolean = false, modifier: Modifier = Modifier) 
         ru.lifety.core.ui.LifetySegmentedControl(listOf("День", "Календарь", "Люди", "Расписание"), tab, { tab = it },
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
         AnimatedContent(tab, modifier = Modifier.weight(1f), label = "planTab",
-            transitionSpec = { fadeIn(tween(LifetyMotion.Standard)) togetherWith fadeOut(tween(LifetyMotion.Quick)) }) { selectedTab ->
+            transitionSpec = { if (isIos) EnterTransition.None togetherWith ExitTransition.None else fadeIn(tween(LifetyMotion.Standard)) togetherWith fadeOut(tween(LifetyMotion.Quick)) }) { selectedTab ->
             stateHolder.SaveableStateProvider(listOf("tasks", "calendar", "people", "schedule")[selectedTab]) {
                 Box(Modifier.fillMaxSize()) {
                     when (selectedTab) {

@@ -875,3 +875,22 @@ interface ScheduleRepository {
   экранов на SwiftUI не выполнялась.
 
 Проверки и ограничения текущего изменения: [SCHEDULE_AND_IOS_FIXES.md](SCHEDULE_AND_IOS_FIXES.md).
+
+
+## Оптимизация — 31 октября 2026
+
+Публичные модели/репозитории/route IDs и schema 8 не меняются.
+Внутренние `core/planner/IntervalIndex.kt` и `feature/finance/FinancePresentation.kt`
+содержат чистые расчёты. Finance/Tasks/Health публикуют фоновые результаты через
+отменяемую Compose-корутину; идентичность расчёта отделяет новый фильтр от старого
+результата. Главная и проверки ChatGPT используют Default; транзакционная повторная
+проверка `PlanningRepository.apply` остаётся обязательной. ViewModel/repository
+порядок истории сохранён.
+
+Динамические planning/navigation locals отслеживают читателей. Постоянный DI
+остаётся static; экземпляры репозиториев не создаются в экранах. UIKit appearance
+кешируется в пределах жизни native view и сбрасывается при release. iOS получает
+мгновенные tab/segment transitions, Android сохраняет fade. Дополнительная схема
+`iosApp/Lifety.xcodeproj/xcshareddata/xcschemes/Lifety Performance.xcscheme` запускает
+Release без LLDB; старую Debug-схему не заменяет. Результаты и границы —
+[PERFORMANCE.md](PERFORMANCE.md).

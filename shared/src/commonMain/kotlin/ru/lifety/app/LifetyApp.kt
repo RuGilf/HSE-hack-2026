@@ -142,10 +142,10 @@ private fun LifetyContent(repositories: Repositories?) {
                         NavHost(
                             controller, startDestination = AppDestination.DASHBOARD.route,
                             modifier = Modifier.fillMaxSize().padding(padding),
-                            enterTransition = { fadeIn(tween(LifetyMotion.Standard)) },
-                            exitTransition = { fadeOut(tween(LifetyMotion.Quick)) },
-                            popEnterTransition = { fadeIn(tween(LifetyMotion.Standard)) },
-                            popExitTransition = { fadeOut(tween(LifetyMotion.Quick)) },
+                            enterTransition = { if (isIos) EnterTransition.None else fadeIn(tween(LifetyMotion.Standard)) },
+                            exitTransition = { if (isIos) ExitTransition.None else fadeOut(tween(LifetyMotion.Quick)) },
+                            popEnterTransition = { if (isIos) EnterTransition.None else fadeIn(tween(LifetyMotion.Standard)) },
+                            popExitTransition = { if (isIos) ExitTransition.None else fadeOut(tween(LifetyMotion.Quick)) },
                         ) {
                             composable(AppDestination.DASHBOARD.route) { SectionGuard("dashboard") { DashboardScreen(Modifier.fillMaxSize()) } }
                             composable(AppDestination.TASKS.route) { SectionGuard("tasks") { PlanScreen(modifier = Modifier.fillMaxSize()) } }

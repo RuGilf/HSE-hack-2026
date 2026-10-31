@@ -19,8 +19,9 @@ data class FinanceDate(val year: Int, val month: Int, val day: Int) : Comparable
     }
 
     companion object {
+        private val datePattern = Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}")
         fun parse(text: String): FinanceDate? {
-            if (!Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(text)) return null
+            if (!datePattern.matches(text)) return null
             val year = text.substring(0, 4).toInt()
             val month = text.substring(5, 7).toInt()
             val day = text.substring(8, 10).toInt()

@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.*
 import ru.lifety.core.model.Task
 import ru.lifety.core.navigation.LocalPlannerNavigation
@@ -26,6 +28,8 @@ import ru.lifety.core.time.formatDate
 import ru.lifety.core.time.localDate
 import ru.lifety.core.ui.*
 import kotlin.time.Clock
+
+private data class PlannerPresentation(val plan: DayPlan, val timeline: DayTimeline, val visible: List<Task>)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,13 +55,22 @@ fun TasksScreen(modifier: Modifier = Modifier) {
     val zone = TimeZone.currentSystemDefault()
     val today = localDate(now, zone)
     val selected = selectedIso?.let { LocalDate.parse(it) } ?: today
-    val plan = remember(state.tasks, selected, now, zone) { dayPlan(state.tasks, selected, now, zone) }
     val planningState = LocalPlanningState.current
     val retryPlanning = LocalPlanningRetry.current
     val details = planningState.plans
-    val timeline = remember(state.tasks, details, planningState.schedule, selected, zone, filter, fromHour, untilHour) {
-        dayTimeline(visibleTasks(state.tasks, filter), details, selected, zone, fromHour, untilHour, planningState.schedule)
+    val calculationKey = remember(state.tasks, details, planningState.schedule, selected, zone, filter, fromHour, untilHour) { Any() }
+    val presentationState = key(calculationKey) {
+        produceState<PlannerPresentation?>(null, now) {
+            value = withContext(Dispatchers.Default) {
+                val visible = visibleTasks(state.tasks, filter)
+                PlannerPresentation(dayPlan(state.tasks, selected, now, zone),
+                    dayTimeline(visible, details, selected, zone, fromHour, untilHour, planningState.schedule), visible)
+            }
+        }
     }
+    val presentation by presentationState
+    val plan = presentation?.plan ?: DayPlan(emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+    val timeline = presentation?.timeline ?: DayTimeline(emptyList(), emptyList(), 0, 0)
     var pendingDelete by remember { mutableStateOf<Task?>(null) }
     var editingScheduleId by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
@@ -91,7 +104,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier.semantics { contentDescription = "Следующий день" }) { Text("›", style = MaterialTheme.typography.headlineSmall) }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (allDates) "Всего дел: ${state.tasks.size}" else "${plan.activeCount + plan.completed.size} в плане · ${plan.undated.size} без даты",
+                Text(if (allDates) "Всего дел: ${state.tasks.size}" else if (presentation == null) "Готовим план…" else "${plan.activeCount + plan.completed.size} в плане · ${plan.undated.size} без даты",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                 if (!allDates && selected != today) TextButton(onClick = { selectedIso = null }) { Text("Сегодня") }
             }
@@ -110,6 +123,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                     Text(requireNotNull(state.readError), color = MaterialTheme.colorScheme.error)
                     Button(onClick = model::retry) { Text("Повторить") }
                 }
+                presentation == null -> CircularProgressIndicator(Modifier.padding(24.dp))
                 !allDates && timelineMode && planningState.loading -> CircularProgressIndicator(Modifier.padding(24.dp))
                 !allDates && timelineMode && planningState.error != null -> Column {
                     Text(requireNotNull(planningState.error), color = MaterialTheme.colorScheme.error)
@@ -117,7 +131,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                 }
                 else -> {
                     val timedIds = if (!allDates && timelineMode) timeline.tasks.mapTo(mutableSetOf()) { it.task.id } else emptySet()
-                    val sections = if (allDates) listOf("" to visibleTasks(state.tasks, filter)) else buildList {
+                    val sections = if (allDates) listOf("" to presentation!!.visible) else buildList {
                         if (filter != TaskFilter.COMPLETED) {
                             add("Просроченные" to plan.overdue)
                             add("Дедлайны на ${formatDate(selected)}" to plan.due)

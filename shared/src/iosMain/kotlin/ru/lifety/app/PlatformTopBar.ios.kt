@@ -23,8 +23,15 @@ internal actual fun PlatformTopBar(title: String, showMascot: Boolean, onSection
         @ObjCAction fun openSettings() { settings() }
     } }
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val accent = MaterialTheme.colorScheme.primary.toUiColor()
-    val text = MaterialTheme.colorScheme.onSurface.toUiColor()
+    val colors = MaterialTheme.colorScheme
+    val accent = remember(colors.primary) { colors.primary.toUiColor() }
+    val appearance = remember(colors.onSurface) {
+        UINavigationBarAppearance().apply {
+            configureWithTransparentBackground()
+            titleTextAttributes = mapOf(NSForegroundColorAttributeName to colors.onSurface.toUiColor())
+        }
+    }
+    val applied = remember { object { var appearance: UINavigationBarAppearance? = null } }
     UIKitView(factory = {
         UINavigationBar().apply {
             translucent = true
@@ -41,17 +48,18 @@ internal actual fun PlatformTopBar(title: String, showMascot: Boolean, onSection
         properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.NonCooperative,
             isNativeAccessibilityEnabled = true, placedAsOverlay = true),
         update = { bar ->
-            bar.tintColor = accent
-            bar.overrideUserInterfaceStyle = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
-            bar.topItem?.title = title
-            val appearance = UINavigationBarAppearance().apply {
-                configureWithTransparentBackground()
-                titleTextAttributes = mapOf(NSForegroundColorAttributeName to text)
+            if (bar.tintColor != accent) bar.tintColor = accent
+            val style = if (dark) UIUserInterfaceStyle.UIUserInterfaceStyleDark else UIUserInterfaceStyle.UIUserInterfaceStyleLight
+            if (bar.overrideUserInterfaceStyle != style) bar.overrideUserInterfaceStyle = style
+            if (bar.topItem?.title != title) bar.topItem?.title = title
+            if (applied.appearance !== appearance) {
+                bar.standardAppearance = appearance
+                bar.scrollEdgeAppearance = appearance
+                bar.compactAppearance = appearance
+                applied.appearance = appearance
             }
-            bar.standardAppearance = appearance
-            bar.scrollEdgeAppearance = appearance
-            bar.compactAppearance = appearance
         }, onRelease = { bar ->
+            applied.appearance = null
             bar.topItem?.leftBarButtonItem?.target = null
             bar.topItem?.rightBarButtonItem?.target = null
         })

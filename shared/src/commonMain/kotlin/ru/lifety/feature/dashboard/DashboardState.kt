@@ -3,6 +3,7 @@ package ru.lifety.feature.dashboard
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -78,7 +79,7 @@ class DashboardController(repositories: Repositories?, scope: CoroutineScope) {
                 combine(repositories.tasks.observeAll(), repositories.expenses.observeAll(), repositories.health.observeLatest(), clock) { tasks, expenses, health, now ->
                     val period = dashboardPeriod(now)
                     DashboardUiState(false, summarizeDashboard(tasks, expenses, health, now, period), period.label, allTasks = tasks)
-                }.collect { mutableState.value = it }
+                }.flowOn(Dispatchers.Default).collect { mutableState.value = it }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { mutableState.value = mutableState.value.copy(loading = false, error = "Не удалось загрузить обзор. Повторите попытку.") }
         }

@@ -9,7 +9,7 @@ import ru.lifety.core.repository.Repositories
 internal data class PlanningUiState(val loading: Boolean = false, val goals: List<Goal> = emptyList(),
     val plans: Map<String, TaskPlan> = emptyMap(), val report: PlanReport? = null, val error: String? = null,
     val schedule: List<ScheduleBlock> = emptyList())
-internal val LocalPlanningState = staticCompositionLocalOf { PlanningUiState() }
+internal val LocalPlanningState = compositionLocalOf { PlanningUiState() }
 internal val LocalPlanningRetry = staticCompositionLocalOf<() -> Unit> { {} }
 
 @Composable
@@ -26,5 +26,6 @@ internal fun PlanningProvider(repositories: Repositories?, content: @Composable 
             emit(PlanningUiState(error = "Не удалось загрузить цели и план"))
         }.collect { value = it }
     }
-    CompositionLocalProvider(LocalPlanningState provides state, LocalPlanningRetry provides { retry++ }, content = content)
+    val reload: () -> Unit = remember { { retry += 1 } }
+    CompositionLocalProvider(LocalPlanningState provides state, LocalPlanningRetry provides reload, content = content)
 }

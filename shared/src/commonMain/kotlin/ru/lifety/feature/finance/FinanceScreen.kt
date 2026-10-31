@@ -18,6 +18,9 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.datetime.TimeZone
 import ru.lifety.core.model.Expense
 import ru.lifety.core.ui.isIos
 import ru.lifety.core.ui.LifetyMotion
@@ -76,7 +79,8 @@ fun FinanceContent(
 ) {
     val scope = rememberCoroutineScope()
     val bottomInset = LocalBottomNavigationInset.current
-    val today = localFinanceDate(financeNow())
+    val zone = TimeZone.currentSystemDefault()
+    val today = financeCalendarDate(financeNow(), zone)
     var currency by rememberSaveable { mutableStateOf("RUB") }
     var fromText by rememberSaveable { mutableStateOf(today.copy(day = 1).toString()) }
     var toText by rememberSaveable { mutableStateOf(today.firstDayOfNextMonth().previousDay().toString()) }
@@ -99,8 +103,9 @@ fun FinanceContent(
     )) { mutableStateOf(emptyMap<String, Long>()) }
     val pending by FinanceNotifications.inbox.pending.collectAsState()
     val importResult by FinanceNotifications.intake.lastResult.collectAsState()
-    val savedIds = state.expenses.map { it.id }.toSet()
-    val suggestions = pending.filterNot { it.id in savedIds }
+    val savedIds = remember(state.expenses) { state.expenses.mapTo(HashSet()) { it.id } }
+    val suggestions = remember(pending, savedIds) { pending.filterNot { it.id in savedIds } }
+    val currencies = remember(state.expenses) { (listOf("RUB", "USD", "EUR") + state.expenses.map { it.currency }).distinct() }
     val from = FinanceDate.parse(fromText)
     val to = FinanceDate.parse(toText)
     val periodValid = allTime || (from != null && to != null && from <= to)
@@ -111,16 +116,16 @@ fun FinanceContent(
                 (if (allTime) Long.MAX_VALUE else financeDayStart(requireNotNull(to).nextDay()))
         }.getOrNull()
     }
-    val summary = remember(state.expenses, currency, bounds) {
-        bounds?.let { (start, end) -> runCatching { summarizeExpenses(state.expenses, currency, start, end) }.getOrNull() }
-    }
-    val quickTotals = remember(state.expenses, currency, today) {
-        FinancePeriod.entries.associateWith { period ->
-            val range = financePeriodDates(period, today)
-            runCatching { summarizeExpenses(state.expenses, currency,
-                financeDayStart(range.from), financeDayStart(range.until)).totalMinor }.getOrNull()
+    // A new key gets a new state, so a previous range/currency can never flash as current.
+    val calculationKey = remember(state.expenses, currency, bounds, today, zone) { Any() }
+    val presentationState = key(calculationKey) {
+        produceState<FinancePresentation?>(null) {
+            value = withContext(Dispatchers.Default) { financePresentation(state.expenses, currency, bounds, today, zone) }
         }
     }
+    val presentation by presentationState
+    val summary = presentation?.summary
+    val quickTotals = presentation?.quickTotals.orEmpty()
 
     Scaffold(modifier = modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
@@ -144,7 +149,7 @@ fun FinanceContent(
             Notice(state.error)
             TextButton(onClick = onRetry, enabled = !state.saving) { Text("Повторить загрузку") }
         }
-        if (state.loading || state.saving) item { LinearProgressIndicator(Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.outlineVariant) }
+        if (state.loading || state.saving || presentation == null) item { LinearProgressIndicator(Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.outlineVariant) }
         if (onManageCategories != null) item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onManageCategories, enabled = !state.saving) {
@@ -187,13 +192,13 @@ fun FinanceContent(
                 }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                (listOf("RUB", "USD", "EUR") + state.expenses.map { it.currency }).distinct().forEach { code ->
+                currencies.forEach { code ->
                     FilterChip(selected = currency == code, onClick = { currency = code }, label = { Text(code) })
                 }
             }
         }
         if (!periodValid) item { Notice("Укажите корректные даты; начало периода должно быть не позже конца.") }
-        else if (summary == null) item { Notice("Итог нельзя рассчитать: переполнение суммы или некорректная запись. Исправьте расходы.") }
+        else if (summary == null && presentation != null) item { Notice("Итог нельзя рассчитать: переполнение суммы или некорректная запись. Исправьте расходы.") }
         if (summary != null) {
             item {
                 Card(Modifier.fillMaxWidth()) {
@@ -207,7 +212,7 @@ fun FinanceContent(
             }
             if (summary.byCategory.isNotEmpty()) item { CategoryChart(summary, currency) }
         }
-        if (storageConnected && !state.loading) item {
+        if (storageConnected && !state.loading && presentation != null) item {
             Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     FinancePeriod.entries.forEach { period ->
@@ -223,7 +228,7 @@ fun FinanceContent(
             }
         }
         item {
-            if (storageConnected && !state.loading) {
+            if (storageConnected && !state.loading && presentation != null) {
                 MonthlyBudgetCard(budgetMonth, currency, quickTotals[FinancePeriod.MONTH], budgets[currency],
                     onEdit = { showBudget = true })
             }
@@ -271,14 +276,12 @@ fun FinanceContent(
         }
         item { Text("Транзакции", style = MaterialTheme.typography.titleLarge) }
         // Keep individual entries accessible even if a corrupt total cannot be calculated.
-        val visible = summary?.expenses ?: bounds?.let { (start, end) ->
-            selectExpenses(state.expenses, currency, start, end)
-        }.orEmpty()
-        if (visible.isEmpty() && !state.loading && periodValid && storageConnected) item {
+        val groups = presentation?.groups.orEmpty()
+        if (groups.isEmpty() && presentation != null && !state.loading && periodValid && storageConnected) item {
             LifetyEmptyState("Пока без расходов", "Добавь первый расход, чтобы видеть свой ритм трат.",
                 emotion = LifetyEmotion.Calm, mascotSize = 80.dp)
         }
-        visible.groupBy { localFinanceDate(it.timestamp) }.forEach { (date, expenses) ->
+        groups.forEach { (date, expenses) ->
             item(key = "date:$date") { Text(date.toString(), style = MaterialTheme.typography.titleSmall) }
             items(expenses, key = { "expense:${it.id}" }, contentType = { "expense" }) { expense ->
                 Box(Modifier.animateItem(placementSpec = tween(LifetyMotion.Standard), fadeInSpec = tween(LifetyMotion.Quick), fadeOutSpec = tween(LifetyMotion.Quick))) {

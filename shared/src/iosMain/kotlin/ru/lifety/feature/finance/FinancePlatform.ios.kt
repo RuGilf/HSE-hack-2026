@@ -2,28 +2,26 @@ package ru.lifety.feature.finance
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import platform.Foundation.NSDate
-import platform.Foundation.NSDateFormatter
-import platform.Foundation.NSLocale
+import kotlinx.datetime.TimeZone
+import kotlin.time.Clock
+import kotlin.native.concurrent.ThreadLocal
 import platform.Foundation.NSTimeZone
 import platform.Foundation.defaultTimeZone
-import platform.Foundation.dateWithTimeIntervalSince1970
-import platform.Foundation.timeIntervalSince1970
 
-internal actual fun financeNow(): Long = (NSDate().timeIntervalSince1970 * 1000).toLong()
+// Kotlin/Native reconstructs regional timezone rules in currentSystemDefault().
+// Keep a worker-local object, but check the system ID so travel/settings changes remain visible.
+@ThreadLocal
+private var cachedZone: Pair<String, TimeZone>? = null
 
-private fun dateFormatter() = NSDateFormatter().apply {
-    locale = NSLocale(localeIdentifier = "en_US_POSIX")
-    timeZone = NSTimeZone.defaultTimeZone
-    dateFormat = "yyyy-MM-dd"
-    lenient = false
+private fun financeZone(): TimeZone {
+    val id = NSTimeZone.defaultTimeZone.name
+    cachedZone?.takeIf { it.first == id }?.let { return it.second }
+    return TimeZone.currentSystemDefault().also { cachedZone = id to it }
 }
 
-internal actual fun localFinanceDate(timestamp: Long): FinanceDate =
-    requireNotNull(FinanceDate.parse(dateFormatter().stringFromDate(NSDate.dateWithTimeIntervalSince1970(timestamp.toDouble() / 1000))))
-
-internal actual fun financeDayStart(date: FinanceDate): Long =
-    (requireNotNull(dateFormatter().dateFromString(date.toString())).timeIntervalSince1970 * 1000).toLong()
+internal actual fun financeNow(): Long = Clock.System.now().toEpochMilliseconds()
+internal actual fun localFinanceDate(timestamp: Long): FinanceDate = financeCalendarDate(timestamp, financeZone())
+internal actual fun financeDayStart(date: FinanceDate): Long = financeCalendarDayStart(date, financeZone())
 
 @Composable
 internal actual fun FinanceNotificationAccess() { Text("Автоимпорт уведомлений доступен на Android.") }
